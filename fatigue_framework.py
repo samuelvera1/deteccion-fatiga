@@ -4,7 +4,6 @@ import numpy as np
 import time
 from collections import deque
 from fatigue_core import FaceMeshDetector
-from glasses_detector import ROIGlassesDetector
 from session_recorder import SessionRecorder
 
 
@@ -126,13 +125,11 @@ class SubjectProfile:
 
 class LandmarkStabilityGate:
     """
-    Puerta de estabilidad de landmarks: el rostro debe estar quieto y sin deformaciones durante
-    `required_frames` frames consecutivos antes de calibrar o analizar gafas.
+    Puerta de estabilidad de landmarks: el rostro debe estar quieto durante la calibración.
     - Movimiento: máximo desplazamiento entre frames de landmarks rígidos, en unidades de la
       distancia entre ojos (independiente de la distancia a la cámara).
-    - Deformación: desviación del puente nasal/comisuras respecto a la anatomía calibrada
-      (ROIGlassesDetector.anatomy_deviation). FaceMesh deforma la malla cuando una mano tapa
-      parcialmente la cara o las gafas se están colocando, aunque la cabeza no se mueva.
+    - deformation (opcional): penalización externa; el monitor pasa infinito si la cabeza no está de
+      frente (orientación fuera de POSE_STABLE_MAX), para no calibrar con la cabeza girada.
     """
 
     RIGID_LANDMARKS = [33, 133, 362, 263, 168, 6, 1, 10, 152, 234, 454]
@@ -174,17 +171,22 @@ class FatigueMonitor:
     """
     Framework con interfaz UI/HUD profesional moderna y registro de telemetría.
 
-    Pipeline secuencial (se repite completo con la tecla 'c' o automáticamente al cambiar de gafas):
-      1. FASE_ROSTRO: perfil neutro del sujeto (apertura ocular, boca, IPD 3D) y anatomía para el ROI,
-         solo con frames estables.
+    Pipeline secuencial (se repite completo con la tecla 'c'):
+      1. FASE_ROSTRO: perfil neutro del sujeto (apertura ocular, boca, IPD 3D, postura frontal), solo con
+         frames estables y de frente.
       2. FASE_CIERRE: el sujeto cierra los ojos hasta oír un pitido -> nivel de ojo cerrado (para el P80).
-      3. FASE_GAFAS: tras 15 frames estables consecutivos, mediana del score de gafas en 30 frames
-         estables y neutros; si la estabilidad se rompe, la recogida empieza de nuevo.
-      4. FASE_MONITOREO: parpadeos (referencia local), PERCLOS P80 y micro-sueño (cierre >= 80 %),
-         bostezos; métricas normalizadas por IPD 3D, con vigilancia del score de gafas.
+      3. FASE_MONITOREO: parpadeos (referencia local), PERCLOS P80 y micro-sueño (cierre >= 80 %),
+         bostezos; métricas normalizadas por IPD 3D.
+
+    Gafas: la condición (con/sin gafas) la DECLARA el investigador (--condicion). El detector automático
+    por bordes se retiró: su score dependía de la distancia a la cámara (con gafas ~5 a 50-70 px de IPD
+    frente a 8-17 a >= 80 px) y de la persona (sujetos sin gafas de hasta 11.5), y las métricas ya no
+    dependen de las gafas porque el ojo cerrado se calibra en cada sesión. Si el participante se pone o
+    se quita las gafas a mitad de sesión, hay que recalibrar con la tecla C (el ojo cerrado cambia: 19 %
+    frente a 54 % del abierto en S01).
     """
 
-    FASE_ROSTRO, FASE_CIERRE, FASE_GAFAS, FASE_MONITOREO = "rostro", "cierre", "gafas", "monitoreo"
+    FASE_ROSTRO, FASE_CIERRE, FASE_MONITOREO = "rostro", "cierre", "monitoreo"
 
     # Calibración de ojo cerrado: cuentan los frames con apertura < CLOSED_CAPTURE_FACTOR x ojo abierto.
     # Si en CLOSED_CALIBRATION_TIMEOUT s no se completa, se usa CLOSED_FALLBACK_RATIO x ojo abierto
@@ -205,19 +207,6 @@ class FatigueMonitor:
     # Se sale del estado de cierre por debajo de MICROSLEEP_EXIT_CLOSURE para no partir un episodio.
     MICROSLEEP_SECONDS = 1.0
     MICROSLEEP_EXIT_CLOSURE = 0.70
-    # Ojo "no cerrado" para elegir frames neutros en la verificación/vigilancia de gafas
-    NOT_CLOSED_EAR_FACTOR = 0.75
-
-    # Frame "neutro" para analizar gafas: ojos abiertos y boca en reposo (sin pliegues de expresión)
-    NEUTRAL_EAR_FACTOR = 0.85
-
-    # Recalibración automática por cambio de gafas:
-    # - Si el rostro se pierde > FACE_LOST_RECHECK_SECONDS (la mano tapa la cara al ponerse/quitarse
-    #   las gafas), al recuperarlo se repite solo el paso 2; si la decisión cambia, se recalibra todo.
-    # - Si la verificación no reúne frames neutros en GLASSES_RECHECK_TIMEOUT, se recalibra todo.
-    FACE_LOST_RECHECK_SECONDS = 1.0
-    GLASSES_RECHECK_TIMEOUT = 6.0   # incluye esperar 15 frames estables + 30 de análisis
-    PERSISTENT_DEFORMATION_SECONDS = 5.0
 
     LEFT_EYE = [33, 160, 158, 133, 153, 144]
     RIGHT_EYE = [362, 385, 387, 263, 373, 380]
@@ -323,9 +312,6 @@ class FatigueMonitor:
         # 20261006_001819 / _002122: ojos cerrados de verdad medidos al 67-77 % sin gafas y 80-88 % con gafas)
         self.detector = FaceMeshDetector(maxFaces=1, minDetectionCon=0.6, minTrackCon=0.6,
                                          refineLandmarks=refine_landmarks)
-        # Umbrales empíricos: sin gafas 3.0-4.5 %, con gafas 10.0-12.5 % -> 7.0 % / 6.0 %, 10 frames
-        self.glasses_detector = ROIGlassesDetector(on_threshold=7.0, off_threshold=6.0, switch_frames=10,
-                                                   analysis_frames=30)
         self.profile = SubjectProfile(calibration_frames)
         self.stability = LandmarkStabilityGate(required_frames=15)
 
@@ -356,10 +342,8 @@ class FatigueMonitor:
         self.perclos_val = 0.0
 
         self.ipd = None
-        self.has_glasses = False
-        self._last_face_time = None
-        self._recheck_prev_glasses = None     # decisión previa mientras se verifica tras perder el rostro
-        self._recheck_deadline = 0.0
+        # Gafas según la condición declarada: True / False, o None si no se declaró
+        self.has_glasses = self._declared_glasses(condition)
         self._last_microsleep_log = 0.0
         self._reset_tracking_state()
 
@@ -372,8 +356,8 @@ class FatigueMonitor:
 
     TRACE_HEADER = ["t", "ipd", "ear_left", "ear_right", "ear", "ear_baseline", "ear_cerrado", "cierre",
                     "p80", "eyes_closed", "mouth", "mouth_neutral", "yawn_thr", "micro_yawn_thr",
-                    "gafas", "gafas_score", "fase", "estable", "movimiento",
-                    "deformacion", "parpadeos", "bostezos", "micro_bostezos", "blink_ref", "blink_closed",
+                    "gafas_declaradas", "fase", "estable", "movimiento",
+                    "parpadeos", "bostezos", "micro_bostezos", "blink_ref", "blink_closed",
                     "boca_ancho_rel", "comisuras_elev", "mandibula_caida", "sonrisa",
                     "cabeza_yaw", "cabeza_pitch", "cabeza_roll", "postura_valida"]
 
@@ -392,8 +376,7 @@ class FatigueMonitor:
                             "cierre_visible_max_ratio": self.CLOSURE_VISIBLE_MAX_RATIO,
                             "frames_estables_requeridos": self.stability.required_frames,
                             "max_movimiento_ipd": self.stability.max_motion,
-                            "max_deformacion_ipd": self.stability.max_deformation,
-                            "factor_ojo_neutro": self.NEUTRAL_EAR_FACTOR, "suavizado_ipd": self.IPD_SMOOTHING},
+                            "suavizado_ipd": self.IPD_SMOOTHING},
             "ojos": {"parpadeo_factor_ref_local": self.BLINK_LOCAL_FACTOR,
                      "parpadeo_margen_reapertura": self.BLINK_REOPEN_MARGIN,
                      "parpadeo_margen_1_frame": self.BLINK_DEEP_MARGIN,
@@ -406,8 +389,7 @@ class FatigueMonitor:
                      "rafaga_reapertura_parcial": self.BURST_REOPEN_CLOSURE,
                      "refractario_parpadeo_frames": self.BLINK_REFRACTORY_FRAMES,
                      "microsueno_cierre_min": self.P80_CLOSURE, "microsueno_min_s": self.MICROSLEEP_SECONDS,
-                     "microsueno_cierre_salida": self.MICROSLEEP_EXIT_CLOSURE,
-                     "ojo_no_cerrado_factor": self.NOT_CLOSED_EAR_FACTOR},
+                     "microsueno_cierre_salida": self.MICROSLEEP_EXIT_CLOSURE},
             "bostezo": {"exagerado_factor_delta_seg": self.yawn_tiers[self.YAWN_TIER_EXAGGERATED],
                         "micro_factor_delta_seg": self.yawn_tiers[self.YAWN_TIER_MICRO],
                         "hueco_tolerado_frames": self.YAWN_GAP_FRAMES,
@@ -418,14 +400,13 @@ class FatigueMonitor:
                         "ventana_s": self.window_seconds, "denominador_minimo_s": self.perclos_min_seconds,
                         "ponderado_por_tiempo": True,
                         "hud_precaucion_pct": self.PERCLOS_WARN_PCT, "hud_alerta_pct": self.PERCLOS_ALERT_PCT},
-            "gafas": self.glasses_detector.parameters(),
+            "gafas": {"origen": "condición declarada por el investigador (--condicion)",
+                      "declaradas": self.has_glasses,
+                      "cambio_a_mitad_de_sesion": "recalibrar con la tecla C"},
             "postura": {"referencia": "postura media de la calibración (mirando al frente)",
                         "max_pitch_metricas_ojo": self.POSE_MAX_PITCH, "max_yaw_metricas_ojo": self.POSE_MAX_YAW,
                         "max_giro_estabilidad": self.POSE_STABLE_MAX,
                         "fuera_de_rango": "no se cuentan parpadeos ni PERCLOS; micro-sueño sí (marcado)"},
-            "recalibracion": {"rostro_perdido_s": self.FACE_LOST_RECHECK_SECONDS,
-                              "timeout_verificacion_s": self.GLASSES_RECHECK_TIMEOUT,
-                              "deformacion_persistente_s": self.PERSISTENT_DEFORMATION_SECONDS},
         }
 
     def _log_event(self, event_type, perclos_val, has_glasses, ear_val, duration=None):
@@ -450,10 +431,9 @@ class FatigueMonitor:
                                      fmt(closure), int(closure is not None and closure >= self.P80_CLOSURE),
                                      int(self.eyes_closed),
                                      fmt(mouth), fmt(self.profile.neutral_mouth_ratio), fmt(yawn_thr), fmt(micro_thr),
-                                     int(self.has_glasses),
-                                     fmt(self.glasses_detector.score), self.phase,
+                                     "" if self.has_glasses is None else int(self.has_glasses), self.phase,
                                      self.stability.stable_frames, fmt(self.stability.motion),
-                                     fmt(self.stability.deformation), self.blink_count, self.yawn_count,
+                                     self.blink_count, self.yawn_count,
                                      self.micro_yawn_count, fmt(self.blink_ref), int(self.blink_closed),
                                      fmt(width_rel), fmt(lift_delta), fmt(jaw_delta), int(self._is_smile(shape)),
                                      *(fmt(a) for a in (self.head_pose or (None, None, None))),
@@ -488,7 +468,6 @@ class FatigueMonitor:
         self.yawn_cooldown_until = 0.0
         self.yawn_episode_start = None        # inicio del episodio de boca abierta en curso
         self.yawn_smile_seen = False          # el episodio en curso tuvo forma de sonrisa
-        self._deformed_since = None
         self._closed_phase_started = None
 
     @property
@@ -497,24 +476,29 @@ class FatigueMonitor:
             return self.FASE_ROSTRO
         if not self.profile.is_closed_calibrated:
             return self.FASE_CIERRE
-        if not self.glasses_detector.is_decided:
-            return self.FASE_GAFAS
         return self.FASE_MONITOREO
 
     def recalibrate(self, reason, full=False):
-        """Descarta perfil y decisión de gafas y reinicia el pipeline desde el paso 1.
-        full=False (automática): conserva la medición de ojo cerrado, sin repetir el paso del pitido.
-        full=True (manual, tecla C): repite también el paso de ojos cerrados."""
+        """Descarta el perfil y reinicia el pipeline desde el paso 1.
+        full=True (manual, tecla C): repite también el paso de ojos cerrados (necesario si el participante se
+        pone o se quita las gafas). full=False conserva la proporción de ojo cerrado medida."""
         self.profile.reset(keep_closed_ratio=not full)
         self._close_pose_interval()
         self.pose_ref, self._pose_samples, self.head_pose = None, [], None
-        self.glasses_detector.reset()
-        self.has_glasses = False
-        self._recheck_prev_glasses = None
         self._reset_tracking_state()
         self.recalibration_count += 1
         print(f"[CALIBRACION] Recalibrando perfil facial ({reason})")
         self._log_event("RECALIBRACION", self.perclos_val, self.has_glasses, 0.0)
+
+    @staticmethod
+    def _declared_glasses(condition):
+        """Interpreta la condición declarada: 'con_gafas' -> True, 'sin_gafas' -> False, otra -> None."""
+        text = (condition or "").lower().replace(" ", "_")
+        if "sin" in text and "gafas" in text:
+            return False
+        if "con" in text and "gafas" in text:
+            return True
+        return None
 
     @staticmethod
     def _beep():
@@ -524,14 +508,6 @@ class FatigueMonitor:
             winsound.Beep(1200, 250)
         except Exception:
             print("\a", end="", flush=True)
-
-    def _start_glasses_recheck(self, now, reason="rostro recuperado"):
-        """Repite solo el paso 2 conservando el perfil; la decisión anterior sigue vigente mientras tanto."""
-        self._recheck_prev_glasses = self.has_glasses
-        self._recheck_deadline = now + self.GLASSES_RECHECK_TIMEOUT
-        self.glasses_detector.start_recheck()
-        self._reset_tracking_state()
-        print(f"[GAFAS] Verificando gafas ({reason})")
 
     def _pose_within(self, max_pitch, max_yaw):
         """True si la cabeza está dentro del rango (o si aún no hay orientación disponible)."""
@@ -567,25 +543,6 @@ class FatigueMonitor:
             self.pose_out_time += duration
             self._log_event("POSTURA_FUERA_DE_RANGO", self.perclos_val, self.has_glasses, 0.0, duration)
             self._pose_out_since = None
-
-    def _persistent_deformation(self, now):
-        """True si el rostro lleva PERSISTENT_DEFORMATION_SECONDS deformado respecto a la anatomía
-        calibrada, quieto, de frente y con los ojos abiertos. Con ojos cerrados nunca dispara: un cabeceo
-        de sueño no debe interrumpir la alarma de micro-sueño. Solo con la cabeza de frente: la deformación
-        medida en 2D crece con cualquier giro (mirar un espejo no es un cambio de anatomía)."""
-        gate = self.stability
-        deformed = (gate.deformation is not None and gate.deformation > gate.max_deformation
-                    and gate.motion <= gate.max_motion and not self.eyes_closed and self.pose_frontal)
-        if not deformed:
-            self._deformed_since = None
-            return False
-        if self._deformed_since is None:
-            self._deformed_since = now
-        return now - self._deformed_since > self.PERSISTENT_DEFORMATION_SECONDS
-
-    @property
-    def is_rechecking_glasses(self):
-        return self._recheck_prev_glasses is not None
 
     # ------------------------------------------------------------------ métricas normalizadas
 
@@ -681,13 +638,6 @@ class FatigueMonitor:
         width, jaw, _ = shape
         return (width >= p.neutral_mouth_width * self.SMILE_MIN_WIDTH_RATIO
                 and jaw - p.neutral_jaw < self.SMILE_MAX_JAW_DROP)
-
-    def _is_neutral_frame(self, ear, mouth, ear_factor=None):
-        """Ojos abiertos y boca en reposo. Tras un cambio de gafas el perfil puede estar desfasado,
-        por eso verificación y vigilancia usan un criterio de ojo más laxo (solo 'no cerrado')."""
-        ear_factor = self.NEUTRAL_EAR_FACTOR if ear_factor is None else ear_factor
-        return (ear >= self.profile.open_ear_baseline * ear_factor
-                and mouth <= self.profile.neutral_mouth_ratio + 0.5 * self.yawn_min_delta)
 
     def _yawn_thresholds(self):
         """Umbral de apertura bucal de cada nivel: [exagerado, micro]."""
@@ -909,30 +859,19 @@ class FatigueMonitor:
         mouth = self._mouth_opening(face, ipd)
         self._last_shape = shape = self._mouth_shape(face, ipd)
 
-        face_was_lost = (self._last_face_time is not None
-                         and now - self._last_face_time > self.FACE_LOST_RECHECK_SECONDS)
-        self._last_face_time = now
-        if face_was_lost and self.phase == self.FASE_MONITOREO:
-            self._start_glasses_recheck(now, "rostro recuperado")
-
         phase = self.phase
-        not_closed_factor = self.NOT_CLOSED_EAR_FACTOR
-        # Puerta de estabilidad: con la orientación disponible, la cabeza debe estar de frente (la deformación
-        # 2D por sí sola confundía giros de cabeza con oclusiones); sin ella, se usa la deformación anatómica
-        deformation = self.glasses_detector.anatomy_deviation(face)
-        is_stable = self.stability.update(face, deformation if self.pose_frontal else float("inf"))
+        # Puerta de estabilidad: cabeza quieta y, si ya hay orientación, de frente
+        is_stable = self.stability.update(face, 0.0 if self.pose_frontal else float("inf"))
 
         if phase == self.FASE_ROSTRO:
-            # Paso 1: perfil neutro + anatomía de puente nasal y comisuras, solo con frames estables
-            # (manos en la cara o cabeza en movimiento falsearían la línea base y las ROIs)
+            # Paso 1: perfil neutro y postura de referencia, solo con frames estables
+            # (manos en la cara o cabeza en movimiento falsearían la línea base)
             if not is_stable:
                 self._write_trace(now, left_ear, right_ear, ear, mouth)
                 return False, False
-            self.glasses_detector.observe_anatomy(face)
             if self._last_axes is not None:
                 self._pose_samples.append(self._last_axes)
             if self.profile.add_sample(ear, mouth, ipd, shape):
-                self.glasses_detector.lock_roi()
                 self._lock_pose_reference()
                 print(f"[PASO 1] Perfil fijado: apertura ocular={self.profile.open_ear_baseline:.4f}, "
                       f"boca neutra={self.profile.neutral_mouth_ratio:.4f}, IPD 3D={self.profile.ipd_baseline:.1f}px")
@@ -973,52 +912,10 @@ class FatigueMonitor:
             self._write_trace(now, left_ear, right_ear, ear, mouth)
             return False, False
 
-        if phase == self.FASE_GAFAS:
-            # Paso 2: tras 15 frames estables consecutivos, solo frames estables y neutros (sin parpadeo
-            # ni boca abierta). Si la estabilidad se rompe (manos, gafas recolocándose), se descarta
-            # lo acumulado: ningún frame de la transición entra en la mediana.
-            ear_factor = not_closed_factor if self.is_rechecking_glasses else None
-            if not is_stable:
-                self.glasses_detector.discard_samples()
-            elif (self.stability.is_ready and self._is_neutral_frame(ear, mouth, ear_factor)
-                  and self.glasses_detector.analyze(frame, face)):
-                if not self.is_rechecking_glasses:
-                    self.has_glasses = self.glasses_detector.has_glasses
-                    self._log_event("GAFAS_DETECTADAS" if self.has_glasses else "SIN_GAFAS",
-                                    self.perclos_val, self.has_glasses, ear)
-                elif self.glasses_detector.has_glasses != self._recheck_prev_glasses:
-                    self.recalibrate("cambio de gafas detectado al recuperar el rostro")
-                else:
-                    self._recheck_prev_glasses = None
-                    print("[GAFAS] Verificación: sin cambios, se mantiene el perfil")
-            if self.is_rechecking_glasses and self.phase == self.FASE_GAFAS and now > self._recheck_deadline:
-                self.recalibrate("verificación de gafas sin frames estables y neutros")
-            self._write_trace(now, left_ear, right_ear, ear, mouth)
-            return False, False
-
-        # Paso 3: monitoreo adaptativo, con vigilancia de gafas en frames estables y neutros
-        is_neutral = (is_stable and not self.eyes_closed
-                      and self.yawn_run_start[self.YAWN_TIER_MICRO] is None
-                      and now >= self.yawn_cooldown_until
-                      and self._is_neutral_frame(ear, mouth, not_closed_factor))
-        if self._persistent_deformation(now):
-            # La anatomía cambió de forma estable (p. ej. gafas que desplazan el puente nasal en la malla):
-            # sin frames estables la vigilancia no correría nunca, y el ROI fijado ya no corresponde a la
-            # cara, así que se recalibra todo (una verificación tampoco reuniría frames estables)
-            self.recalibrate("deformación persistente del rostro")
-            self._write_trace(now, left_ear, right_ear, ear, mouth)
-            return False, False
-        if not is_neutral:
-            self.glasses_detector.break_streak()   # "consecutivos" = frames estables y neutros seguidos
-        elif self.glasses_detector.watch(frame, face):
-            self.recalibrate("cambio de gafas detectado")
-            self._write_trace(now, left_ear, right_ear, ear, mouth)
-            return False, False
-
+        # Paso 3: monitoreo adaptativo
         is_yawning, yawn_blocks_blinks = self._update_yawn(mouth, now, ear, shape)
-        occluded = self.stability.deformation is not None and self.stability.deformation > self.stability.max_deformation
         pose_valid = self._track_pose_range(now)
-        is_microsleep = self._update_eyes(ear, yawn_blocks_blinks, occluded, now, pose_valid)
+        is_microsleep = self._update_eyes(ear, yawn_blocks_blinks, False, now, pose_valid)
         self._write_trace(now, left_ear, right_ear, ear, mouth)
         return is_microsleep, is_yawning
 
@@ -1053,16 +950,14 @@ class FatigueMonitor:
 
         cv2.line(img, (30, 135), (panel_w - 15, 135), (50, 50, 60), 1)
 
-        # Tarjeta 2: Modo Gafas
-        cv2.putText(img, "DETECTOR DE GAFAS", (30, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
-        if not self.glasses_detector.is_decided:
-            status_gafas, color_gafas = "ANALIZANDO...", (0, 200, 255)
+        # Tarjeta 2: gafas según la condición declarada (--condicion)
+        cv2.putText(img, "GAFAS (DECLARADAS)", (30, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
+        if has_glasses is None:
+            status_gafas, color_gafas = "NO DECLARADO", (120, 120, 130)
         else:
             status_gafas = "CON GAFAS" if has_glasses else "SIN GAFAS"
             color_gafas = (0, 255, 200) if has_glasses else (180, 180, 180)
         cv2.putText(img, status_gafas, (30, 185), cv2.FONT_HERSHEY_DUPLEX, 0.6, color_gafas, 1)
-        if self.glasses_detector.score is not None:
-            cv2.putText(img, f"score {self.glasses_detector.score:.1f}%", (160, 185), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
 
         cv2.line(img, (30, 205), (panel_w - 15, 205), (50, 50, 60), 1)
 
@@ -1178,18 +1073,10 @@ class FatigueMonitor:
             self._draw_hud(img, self.perclos_val, self.has_glasses, is_microsleep_active, is_yawning_active)
             phase = self.phase
             if phase == self.FASE_ROSTRO:
-                self._draw_calibration_overlay(img, "PASO 1/3: ANALIZANDO ROSTRO...", self.profile.progress)
+                self._draw_calibration_overlay(img, "PASO 1/2: ANALIZANDO ROSTRO...", self.profile.progress)
             elif phase == self.FASE_CIERRE:
-                self._draw_calibration_overlay(img, "PASO 2/3: CIERRA LOS OJOS...", self.profile.closed_progress,
+                self._draw_calibration_overlay(img, "PASO 2/2: CIERRA LOS OJOS...", self.profile.closed_progress,
                                                subtitle="ABRELOS AL OIR EL PITIDO")
-            elif phase == self.FASE_GAFAS:
-                if not self.stability.is_ready:
-                    title = "QUIETO: ESTABILIZANDO ROSTRO..."
-                    progress = self.stability.stable_frames / float(self.stability.required_frames)
-                else:
-                    title = "VERIFICANDO GAFAS..." if self.is_rechecking_glasses else "PASO 3/3: DETECTANDO GAFAS..."
-                    progress = self.glasses_detector.progress
-                self._draw_calibration_overlay(img, title, progress)
 
             cv2.imshow("Fatigue Framework Monitor", img)
             key = cv2.waitKey(1) & 0xFF

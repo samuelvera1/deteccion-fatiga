@@ -87,7 +87,8 @@ if __name__ == "__main__":
           f"duración media: {resumen['duracion_media_parpadeo_s'] or 0:.2f} s)")
     print(f"Bostezos:             {resumen['bostezos']} (micro: {resumen['micro_bostezos']})")
     print(f"PERCLOS final:        {resumen['perclos_final_pct']:.1f}%")
-    print(f"Gafas (final):        {'SÍ' if resumen['gafas_final'] else 'NO'}")
+    gafas = resumen["gafas_final"]
+    print(f"Gafas (declaradas):   {'(no declaradas)' if gafas is None else ('SÍ' if gafas else 'NO')}")
     print(f"Recalibraciones:      {resumen['recalibraciones']}")
     print(f"FPS de procesamiento: {rendimiento['fps_procesamiento_medio']}")
     print(f"CPU del proceso:      {rendimiento['cpu_proceso_pct_medio']}%")

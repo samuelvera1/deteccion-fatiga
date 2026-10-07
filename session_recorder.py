@@ -175,9 +175,11 @@ class SessionRecorder:
         return 1.0 / float(np.mean(recent)) if recent else None
 
     def log_event(self, t, event, phase, perclos, has_glasses, ear, duration=None):
-        """duration: duración del evento en s (parpadeos, micro-sueño); vacío si no aplica."""
+        """duration: duración del evento en s (parpadeos, micro-sueño); vacío si no aplica.
+        has_glasses: condición declarada (True/False) o None si no se indicó."""
+        glasses = "NO_DECLARADO" if has_glasses is None else ("ACTIVO" if has_glasses else "INACTIVO")
         self._events.writerow([f"{t:.3f}", datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3], event, phase,
-                               f"{perclos:.2f}", "ACTIVO" if has_glasses else "INACTIVO", f"{ear:.4f}",
+                               f"{perclos:.2f}", glasses, f"{ear:.4f}",
                                "" if duration is None else f"{duration:.3f}"])
         self._events_file.flush()
 
