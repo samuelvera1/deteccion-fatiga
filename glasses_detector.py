@@ -48,6 +48,8 @@ class ROIGlassesDetector:
         self.display_smoothing = display_smoothing   # EMA solo para mostrar el score en el HUD
         self.canny_low = canny_low
         self.canny_high = canny_high
+        self.clahe_clip = clahe_clip
+        self.close_kernel_size = close_kernel
         # Teselas grandes (2x2): cada una incluye ojo y montura, así CLAHE no estira el contraste
         # de una tesela de piel lisa (con 4x4 amplificaba el ruido de la piel hasta saturar el ROI)
         self._clahe = cv2.createCLAHE(clipLimit=clahe_clip, tileGridSize=(2, 2))
@@ -55,6 +57,14 @@ class ROIGlassesDetector:
         # que son estructuras mayormente horizontales tras la normalización
         self._close_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, close_kernel)
         self.reset()
+
+    def parameters(self):
+        """Parámetros del método, para registrarlos en los metadatos de cada sesión."""
+        return {"umbral_encendido_pct": self.on_threshold, "umbral_apagado_pct": self.off_threshold,
+                "frames_consecutivos_cambio": self.switch_frames, "frames_analisis_mediana": self.analysis_frames,
+                "canny": [self.canny_low, self.canny_high], "clahe_clip": self.clahe_clip, "clahe_teselas": [2, 2],
+                "filtro_bilateral": [7, 30, 7], "kernel_cierre": list(self.close_kernel_size),
+                "peso_puente": self.BRIDGE_WEIGHT, "ipd_canonica_px": self.CANON_IPD}
 
     def reset(self):
         self._anatomy_samples = []

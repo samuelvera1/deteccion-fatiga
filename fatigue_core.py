@@ -40,18 +40,22 @@ if mp_face_mesh is None or mp_drawing_utils is None:
 class FaceMeshDetector:
     """Núcleo biométrico portátil para la extracción y procesamiento de la malla facial."""
     
-    def __init__(self, staticMode=False, maxFaces=1, minDetectionCon=0.7, minTrackCon=0.7):
+    def __init__(self, staticMode=False, maxFaces=1, minDetectionCon=0.7, minTrackCon=0.7, refineLandmarks=False):
         self.staticMode = staticMode
         self.maxFaces = maxFaces
         self.minDetectionCon = minDetectionCon
         self.minTrackCon = minTrackCon
+        # refine_landmarks activa el modelo Attention Mesh (Grishchenko et al., 2020), que refina ojos y
+        # labios y añade 10 puntos de iris (478 en total; los índices 0-467 no cambian)
+        self.refineLandmarks = refineLandmarks
 
         self.mpDraw = mp_drawing_utils
         self.mpFaceMesh = mp_face_mesh
-        
+
         self.faceMesh = self.mpFaceMesh.FaceMesh(
             static_image_mode=self.staticMode,
             max_num_faces=self.maxFaces,
+            refine_landmarks=self.refineLandmarks,
             min_detection_confidence=self.minDetectionCon,
             min_tracking_confidence=self.minTrackCon
         )
