@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import time
 from collections import deque
+import calibration_marks
 from fatigue_core import FaceMeshDetector
 from session_recorder import SessionRecorder
 
@@ -100,16 +101,39 @@ class SubjectProfile:
         span = self.open_ear_baseline - self.closed_ear_level
         return (self.open_ear_baseline - ear) / span if span > 0 else 0.0
 
-    def add_sample(self, ear, mouth_ratio, ipd, mouth_shape=None):
+    def add_sample(self, ear, mouth_ratio, ipd, mouth_shape=None, auto_finish=True):
         """Acumula un frame neutro; devuelve True en el frame en que se fija el perfil.
-        mouth_shape: (ancho, mandíbula, elevación de comisuras) en unidades de IPD."""
+        mouth_shape: (ancho, mandíbula, elevación de comisuras) en unidades de IPD.
+        auto_finish=False (calibración manual): solo acumula; el perfil se fija con finish_profile()."""
         self._ear_samples.append(ear)
         self._mouth_samples.append(mouth_ratio)
         self._ipd_samples.append(ipd)
         if mouth_shape is not None:
             self._shape_samples.append(mouth_shape)
-        if len(self._ear_samples) < self.calibration_frames:
+        if not auto_finish or len(self._ear_samples) < self.calibration_frames:
             return False
+        self.finish_profile()
+        return True
+
+    @property
+    def n_open_samples(self):
+        return len(self._ear_samples)
+
+    @property
+    def n_closed_samples(self):
+        return len(self._closed_samples)
+
+    def add_manual_closed_sample(self, ear):
+        """Frame del tramo de ojos cerrados marcado a mano (sin filtro de apertura: lo confirma el investigador)."""
+        self._closed_samples.append(ear)
+
+    def finish_manual_closed(self):
+        """Nivel de ojo cerrado = mediana del tramo marcado; registra cada frame para el diagnóstico."""
+        self.closed_phase_ratios = [e / self.open_ear_baseline for e in self._closed_samples]
+        self._set_closed_level(float(np.median(self._closed_samples)), measured=True)
+
+    def finish_profile(self):
+        """Fija el perfil neutro con las muestras acumuladas."""
         # La mediana descarta los parpadeos y gestos puntuales ocurridos durante la calibración
         self.open_ear_baseline = float(np.median(self._ear_samples))
         self.neutral_mouth_ratio = float(np.median(self._mouth_samples))
@@ -120,7 +144,6 @@ class SubjectProfile:
         if self.closed_ratio is not None:     # recalibración automática: no se repite el paso de ojos cerrados
             self.closed_ear_level = self.closed_ratio * self.open_ear_baseline
             self.closed_level_reused = True
-        return True
 
 
 class LandmarkStabilityGate:
@@ -175,8 +198,13 @@ class FatigueMonitor:
       1. FASE_ROSTRO: perfil neutro del sujeto (apertura ocular, boca, IPD 3D, postura frontal), solo con
          frames estables y de frente.
       2. FASE_CIERRE: el sujeto cierra los ojos hasta oír un pitido -> nivel de ojo cerrado (para el P80).
+      2b. FASE_REAPERTURA: espera a que abra los ojos antes de empezar a contar.
       3. FASE_MONITOREO: parpadeos (referencia local), PERCLOS P80 y micro-sueño (cierre >= 80 %),
          bostezos; métricas normalizadas por IPD 3D.
+
+    Calibración manual (vídeos con marcas de revisar.py --video, ver calibration_marks.py): en lugar de
+    los pasos 1-2b, el perfil se calcula con los tramos neutro y de ojos cerrados que marcó el
+    investigador (FASE_MARCAS) y el monitoreo empieza exactamente en el frame de inicio de la prueba.
 
     Gafas: la condición (con/sin gafas) la DECLARA el investigador (--condicion). El detector automático
     por bordes se retiró: su score dependía de la distancia a la cámara (con gafas ~5 a 50-70 px de IPD
@@ -186,7 +214,8 @@ class FatigueMonitor:
     frente a 54 % del abierto en S01).
     """
 
-    FASE_ROSTRO, FASE_CIERRE, FASE_MONITOREO = "rostro", "cierre", "monitoreo"
+    FASE_ROSTRO, FASE_CIERRE, FASE_REAPERTURA, FASE_MONITOREO = "rostro", "cierre", "reapertura", "monitoreo"
+    FASE_MARCAS = "calibracion_manual"
 
     # Calibración de ojo cerrado: cuentan los frames con apertura < CLOSED_CAPTURE_FACTOR x ojo abierto.
     # Si en CLOSED_CALIBRATION_TIMEOUT s no se completa, se usa CLOSED_FALLBACK_RATIO x ojo abierto
@@ -197,6 +226,12 @@ class FatigueMonitor:
     CLOSED_FALLBACK_RATIO = 0.25
     # Si con los ojos cerrados la apertura no baja de este nivel, el cierre apenas es visible en la malla
     CLOSURE_VISIBLE_MAX_RATIO = 0.6
+    # Reapertura tras el paso de ojos cerrados: el monitoreo empieza cuando el cierre baja de
+    # REOPEN_MAX_CLOSURE durante REOPEN_FRAMES frames seguidos. Sin esto, el tiempo que el sujeto tarda
+    # en abrir los ojos tras el pitido (o en un vídeo, donde no hay pitido) contaba como micro-sueño y
+    # PERCLOS (sesión 20261008_143243: micro-sueño falso de 1.02 s nada más terminar la calibración).
+    REOPEN_MAX_CLOSURE = 0.5
+    REOPEN_FRAMES = 3
 
     # PERCLOS P80 (Wierwille et al., 1994; Dinges y Grace, 1998): proporción del tiempo, en una
     # ventana de 1 min, con el párpado >= 80 % cerrado. Incluye los parpadeos (variante elegida;
@@ -254,6 +289,14 @@ class FatigueMonitor:
     # 28 parpadeos en la sesión 20261006_114449 (29 cierres en la señal) y las sesiones de S01 con recuento
     # manual no cambian. PROVISIONAL: falta validar con ráfagas contadas a mano.
     BLINK_REFRACTORY_FRAMES = 3
+    # GIRO RÁPIDO DE CABEZA: al girar rápido, la apertura medida por la malla cae un poco sin que el
+    # párpado se mueva, y al pasar por la postura frontal se contaba como parpadeo (sesión
+    # 20261008_154526: giro de 208 °/s con cierre máximo 0.08, frente a parpadeos reales con cierre
+    # 1.00-1.13 y cabeza a 27-41 °/s). Si durante el episodio la cabeza gira a más de FAST_HEAD_SPEED,
+    # solo cuenta como parpadeo si el cierre llega al P80. No se descartan todos: los giros de mirada
+    # con la cabeza suelen ir acompañados de parpadeos reales (Evinger et al., 1994), que cierran del
+    # todo. Umbral PROVISIONAL (1 sesión; en ella el percentil 99 del giro normal fue 114 °/s).
+    FAST_HEAD_SPEED = 120.0
 
     # PARPADEO = evento transitorio: caída brusca de la apertura respecto a la apertura de justo antes
     # (referencia local = percentil 90 de la apertura entre 0.9 s y 0.3 s antes del frame actual), en la
@@ -274,6 +317,9 @@ class FatigueMonitor:
     YAWN_TIER_EXAGGERATED, YAWN_TIER_MICRO = 0, 1
     YAWN_GAP_FRAMES = 2
     YAWN_COOLDOWN_SECONDS = 1.0
+    # Duración del bostezo = tiempo con la boca por encima del umbral micro (fase de boca abierta), del
+    # primer al último frame sobre el umbral. No es la duración completa del bostezo (Provine, 1986:
+    # ~6 s de media incluyendo inspiración y cierre), sino la parte visible como apertura bucal.
 
     IPD_SMOOTHING = 0.2       # EMA: la IPD es rígida, solo cambia con la distancia a la cámara
 
@@ -282,7 +328,7 @@ class FatigueMonitor:
     PERCLOS_ALERT_PCT = 22.0
 
     def __init__(self, video_source=0, subject_id="anonimo", condition=None, save_trace=True, sessions_dir="sesiones",
-                 subject_code=None,
+                 subject_code=None, manual_marks=None,
                  refine_landmarks=True, capture_size=(1280, 720),
                  yawn_factor=1.65, yawn_min_delta=0.25, yawn_min_seconds=0.5,
                  micro_yawn_factor=1.30, micro_yawn_min_delta=0.15, micro_yawn_min_seconds=0.35,
@@ -292,6 +338,10 @@ class FatigueMonitor:
         self.subject_id = subject_id
         self.condition = condition            # condición experimental declarada (p. ej. con_gafas)
         self.subject_code = subject_code      # código anónimo (S01...) guardado junto al nombre
+        # Marcas de calibración manual del vídeo (calibration_marks), ya validadas; None = automática
+        self.manual_marks = manual_marks
+        self._manual_pending = manual_marks is not None
+        self.test_start_s = None              # inicio del monitoreo (s), para el resumen
         self.save_trace = save_trace
         # Resolución pedida a la cámara (None = la nativa). A 640x480 la cara lejana ocupa pocos píxeles: con
         # IPD de 50-70 px la montura de las gafas casi no deja bordes (sesión 20261006_212220). Si la cámara
@@ -328,7 +378,11 @@ class FatigueMonitor:
         self.pose_ref = None                  # ejes de la cabeza en la calibración (postura frontal)
         self._pose_samples = []
         self._last_axes = None
+        self._last_axes_t = None
+        self.head_speed = None                # velocidad de giro de la cabeza (°/s) en el último frame
         self.head_pose = None                 # (yaw, pitch, roll) en grados respecto a la calibración
+        self.yawn_durations = []              # duración (s) de la apertura bucal de cada bostezo contado
+        self.fast_turn_rejected = 0           # caídas de apertura descartadas por giro rápido de cabeza
         self._pose_out_since = None           # inicio del intervalo de postura fuera de rango en curso
         self.pose_out_time = 0.0              # tiempo total (s) de monitoreo con postura fuera de rango
 
@@ -359,7 +413,9 @@ class FatigueMonitor:
                     "gafas_declaradas", "fase", "estable", "movimiento",
                     "parpadeos", "bostezos", "micro_bostezos", "blink_ref", "blink_closed",
                     "boca_ancho_rel", "comisuras_elev", "mandibula_caida", "sonrisa",
-                    "cabeza_yaw", "cabeza_pitch", "cabeza_roll", "postura_valida"]
+                    "cabeza_yaw", "cabeza_pitch", "cabeza_roll", "postura_valida",
+                    "frame",   # índice del frame en la fuente (0 = primero); los frames sin rostro no tienen fila
+                    "cabeza_vel"]   # velocidad de giro de la cabeza (°/s)
 
     def parameters(self):
         """Todos los parámetros del método, para los metadatos de la sesión (sección de métodos)."""
@@ -374,6 +430,10 @@ class FatigueMonitor:
                             "timeout_ojo_cerrado_s": self.CLOSED_CALIBRATION_TIMEOUT,
                             "reserva_ojo_cerrado_ratio": self.CLOSED_FALLBACK_RATIO,
                             "cierre_visible_max_ratio": self.CLOSURE_VISIBLE_MAX_RATIO,
+                            "reapertura_cierre_max": self.REOPEN_MAX_CLOSURE,
+                            "reapertura_frames": self.REOPEN_FRAMES,
+                            "modo": "manual (marcas del vídeo)" if self.manual_marks else "automatica",
+                            "marcas_manuales": self.manual_marks,
                             "frames_estables_requeridos": self.stability.required_frames,
                             "max_movimiento_ipd": self.stability.max_motion,
                             "suavizado_ipd": self.IPD_SMOOTHING},
@@ -388,6 +448,8 @@ class FatigueMonitor:
                      "rafaga_cierre_pico": self.BURST_PEAK_CLOSURE,
                      "rafaga_reapertura_parcial": self.BURST_REOPEN_CLOSURE,
                      "refractario_parpadeo_frames": self.BLINK_REFRACTORY_FRAMES,
+                     "giro_rapido_cabeza_gs": self.FAST_HEAD_SPEED,
+                     "giro_rapido_cierre_min": self.P80_CLOSURE,
                      "microsueno_cierre_min": self.P80_CLOSURE, "microsueno_min_s": self.MICROSLEEP_SECONDS,
                      "microsueno_cierre_salida": self.MICROSLEEP_EXIT_CLOSURE},
             "bostezo": {"exagerado_factor_delta_seg": self.yawn_tiers[self.YAWN_TIER_EXAGGERATED],
@@ -409,9 +471,11 @@ class FatigueMonitor:
                         "fuera_de_rango": "no se cuentan parpadeos ni PERCLOS; micro-sueño sí (marcado)"},
         }
 
-    def _log_event(self, event_type, perclos_val, has_glasses, ear_val, duration=None):
+    def _log_event(self, event_type, perclos_val, has_glasses, ear_val, duration=None, end_time=None):
+        """end_time: instante en que terminó el evento si no es el frame actual (t_s = fin del evento)."""
         if self.session:
-            self.session.log_event(self._now, event_type, self.phase, perclos_val, has_glasses, ear_val, duration)
+            self.session.log_event(self._now if end_time is None else end_time, event_type, self.phase,
+                                   perclos_val, has_glasses, ear_val, duration)
 
     def _write_trace(self, now, left_ear, right_ear, ear, mouth):
         if not (self.session and self.session.save_trace):
@@ -437,7 +501,7 @@ class FatigueMonitor:
                                      self.micro_yawn_count, fmt(self.blink_ref), int(self.blink_closed),
                                      fmt(width_rel), fmt(lift_delta), fmt(jaw_delta), int(self._is_smile(shape)),
                                      *(fmt(a) for a in (self.head_pose or (None, None, None))),
-                                     int(self.eye_pose_valid)])
+                                     int(self.eye_pose_valid), self.frames_total - 1, fmt(self.head_speed)])
 
     def on_blink(self, callback_function):
         self._on_blink = callback_function
@@ -467,15 +531,23 @@ class FatigueMonitor:
         self.yawn_exaggerated = False         # el episodio actual alcanzó el nivel 1
         self.yawn_cooldown_until = 0.0
         self.yawn_episode_start = None        # inicio del episodio de boca abierta en curso
+        self.yawn_last_open = None            # último instante con la boca sobre el umbral micro
+        self.blink_max_head_speed = 0.0       # giro de cabeza máximo (°/s) durante el cierre en curso
         self.yawn_smile_seen = False          # el episodio en curso tuvo forma de sonrisa
         self._closed_phase_started = None
+        self._reopen_streak = 0
+        self._monitoring_started = False
 
     @property
     def phase(self):
+        if self._manual_pending:
+            return self.FASE_MARCAS
         if not self.profile.is_calibrated:
             return self.FASE_ROSTRO
         if not self.profile.is_closed_calibrated:
             return self.FASE_CIERRE
+        if not self._monitoring_started:
+            return self.FASE_REAPERTURA
         return self.FASE_MONITOREO
 
     def recalibrate(self, reason, full=False):
@@ -483,12 +555,50 @@ class FatigueMonitor:
         full=True (manual, tecla C): repite también el paso de ojos cerrados (necesario si el participante se
         pone o se quita las gafas). full=False conserva la proporción de ojo cerrado medida."""
         self.profile.reset(keep_closed_ratio=not full)
+        self._manual_pending = False          # tras recalibrar se usa la calibración automática
         self._close_pose_interval()
         self.pose_ref, self._pose_samples, self.head_pose = None, [], None
         self._reset_tracking_state()
         self.recalibration_count += 1
         print(f"[CALIBRACION] Recalibrando perfil facial ({reason})")
         self._log_event("RECALIBRACION", self.perclos_val, self.has_glasses, 0.0)
+
+    def _start_monitoring(self, now):
+        self._monitoring_started = True
+        if self.test_start_s is None:
+            self.test_start_s = now
+        print(f"[MONITOREO] Empieza el conteo en t = {now:.2f} s")
+
+    def _finish_manual_calibration(self, now):
+        """Al llegar al frame de inicio de la prueba: fija el perfil con los tramos marcados. Si en algún
+        tramo no se detectó el rostro en suficientes frames, se pasa a la calibración automática."""
+        self._manual_pending = False
+        p = self.profile
+        if (p.n_open_samples < calibration_marks.MIN_NEUTRAL_FRAMES
+                or p.n_closed_samples < calibration_marks.MIN_CLOSED_FRAMES):
+            print(f"[AVISO] Calibración manual inválida: rostro detectado en {p.n_open_samples} frames del tramo "
+                  f"neutro y {p.n_closed_samples} del de ojos cerrados (mínimo {calibration_marks.MIN_NEUTRAL_FRAMES}"
+                  f" y {calibration_marks.MIN_CLOSED_FRAMES}). Se calibra automáticamente desde aquí.")
+            self.profile.reset()
+            self._pose_samples = []
+            self._log_event("CALIBRACION_MANUAL_FALLIDA", self.perclos_val, self.has_glasses, 0.0)
+            return
+        p.finish_profile()
+        p.finish_manual_closed()
+        self._lock_pose_reference()
+        print(f"[CALIBRACION MANUAL] Ojo abierto={p.open_ear_baseline:.4f} ({p.n_open_samples} frames), "
+              f"ojo cerrado={p.closed_ear_level:.4f} ({p.closed_ratio:.0%} del abierto, {p.n_closed_samples} frames), "
+              f"boca neutra={p.neutral_mouth_ratio:.4f}")
+        self._log_event("CALIBRACION_MANUAL", self.perclos_val, self.has_glasses, p.open_ear_baseline)
+        self._warn_if_closure_not_visible()
+        self._start_monitoring(now)
+
+    def _warn_if_closure_not_visible(self):
+        lowest = self.profile.closed_phase_min_ratio
+        if lowest is not None and lowest > self.CLOSURE_VISIBLE_MAX_RATIO:
+            print(f"[AVISO] Con los ojos cerrados la malla solo bajó al {lowest:.0%} de la apertura normal: "
+                  f"el cierre del párpado apenas se registra. PERCLOS y micro-sueño NO serán fiables en "
+                  f"esta sesión (revisa luz, distancia, gafas o refine_landmarks).")
 
     @staticmethod
     def _declared_glasses(condition):
@@ -564,12 +674,18 @@ class FatigueMonitor:
         axes = np.column_stack([x, y, np.cross(x, y)])
         return axes if np.all(np.isfinite(axes)) else None
 
-    def _update_head_pose(self, face3d):
+    def _update_head_pose(self, face3d, now):
         """Orientación de la cabeza (yaw, pitch, roll en grados) RELATIVA a la postura media de la
         calibración (mirando al frente). Convención R = Ry(yaw)·Rx(pitch)·Rz(roll) en ejes de cámara:
-        yaw = giro a los lados, pitch = arriba/abajo, roll = inclinación hacia el hombro."""
+        yaw = giro a los lados, pitch = arriba/abajo, roll = inclinación hacia el hombro.
+        Además, velocidad de giro (°/s): ángulo de la rotación entre este frame y el anterior / tiempo."""
         axes = self._face_axes(face3d)
-        self._last_axes = axes
+        prev, prev_t = self._last_axes, self._last_axes_t
+        self.head_speed = None
+        if axes is not None and prev is not None and prev_t is not None and now > prev_t:
+            cos_angle = np.clip((np.trace(axes @ prev.T) - 1.0) / 2.0, -1.0, 1.0)
+            self.head_speed = float(np.degrees(np.arccos(cos_angle)) / (now - prev_t))
+        self._last_axes, self._last_axes_t = axes, now
         if axes is None or self.pose_ref is None:
             self.head_pose = None
             return
@@ -680,6 +796,8 @@ class FatigueMonitor:
                     self.yawn_run_start[tier] = now
                     if tier == self.YAWN_TIER_MICRO:
                         self.yawn_episode_start, self.yawn_smile_seen = now, False
+                if tier == self.YAWN_TIER_MICRO:
+                    self.yawn_last_open = now     # último frame con la boca sobre el umbral (fin del episodio)
                 self.yawn_run_gap[tier] = 0
             elif self.yawn_run_start[tier] is not None:
                 self.yawn_run_gap[tier] += 1
@@ -705,19 +823,25 @@ class FatigueMonitor:
                 self._on_yawn(self.yawn_count)
 
         if self.yawn_run_start[self.YAWN_TIER_MICRO] is None:      # fin del episodio
+            # El episodio se cierra YAWN_GAP_FRAMES frames después de que la boca baje del umbral:
+            # el evento se registra en el último frame con la boca abierta, con la duración de la apertura
+            start, end = self.yawn_episode_start, self.yawn_last_open
+            duration = end - start if start is not None and end is not None else None
             if self.yawn_counted:
                 if not self.yawn_exaggerated:
                     self.micro_yawn_count += 1
+                if duration is not None:
+                    self.yawn_durations.append(duration)
                 self._log_event("BOSTEZO" if self.yawn_exaggerated else "MICRO_BOSTEZO",
-                                self.perclos_val, self.has_glasses, ear)
+                                self.perclos_val, self.has_glasses, ear, duration, end_time=end)
                 self.yawn_cooldown_until = now + self.YAWN_COOLDOWN_SECONDS
-            elif self.yawn_smile_seen and self.yawn_episode_start is not None:
+            elif self.yawn_smile_seen and start is not None:
                 self.smile_count += 1
-                self._log_event("SONRISA", self.perclos_val, self.has_glasses, ear, now - self.yawn_episode_start)
+                self._log_event("SONRISA", self.perclos_val, self.has_glasses, ear, duration, end_time=end)
             self.yawn_run_start[self.YAWN_TIER_EXAGGERATED] = None
             self.yawn_counted = False
             self.yawn_exaggerated = False
-            self.yawn_episode_start, self.yawn_smile_seen = None, False
+            self.yawn_episode_start, self.yawn_smile_seen, self.yawn_last_open = None, False, None
 
         is_yawning = self.yawn_counted
         # Solo un bostezo confirmado bloquea parpadeos (hablar no debe bloquearlos)
@@ -756,7 +880,9 @@ class FatigueMonitor:
             if self.blink_closed_frames == 0:
                 self.blink_dip, self.blink_started, self.blink_had_microsleep = ear, now, False
                 self.blink_peak_seen, self.blink_split = False, None
+                self.blink_max_head_speed = 0.0
             self.blink_dip = min(self.blink_dip, ear)
+            self.blink_max_head_speed = max(self.blink_max_head_speed, self.head_speed or 0.0)
             self.blink_closed_frames += 1
             if self.profile.closed_level_measured:
                 self._split_burst(ear, ref, yawn_blocks_blinks, now)
@@ -803,6 +929,13 @@ class FatigueMonitor:
         if not (frames >= self.MIN_BLINK_FRAMES or is_fast_blink):
             return                            # ruido de 1 frame
         if (self.blink_refractory > 0 and not in_burst) or yawn_blocks_blinks or self.blink_had_microsleep:
+            return
+        if (self.blink_max_head_speed > self.FAST_HEAD_SPEED
+                and self.profile.closure(dip) < self.P80_CLOSURE):
+            # caída de apertura durante un giro rápido de cabeza sin cierre real del párpado
+            self.fast_turn_rejected += 1
+            self._log_event("PARPADEO_DESCARTADO_GIRO", self.perclos_val, self.has_glasses, ear, duration,
+                            end_time=end_time)
             return
         if duration < self.LONG_BLINK_SECONDS:
             self.blink_count += 1
@@ -851,7 +984,7 @@ class FatigueMonitor:
     def _process_face(self, face, face3d, frame, now):
         """Procesa un rostro detectado. Devuelve (micro-sueño activo, bostezo en curso)."""
         ipd = self._update_ipd(face3d)
-        self._update_head_pose(face3d)
+        self._update_head_pose(face3d, now)
         left_ear = self._eye_opening(face, self.LEFT_EYE, ipd)
         right_ear = self._eye_opening(face, self.RIGHT_EYE, ipd)
         # Promedio de ambos ojos: con max(), un reflejo en una lente enmascaraba el parpadeo del otro
@@ -862,6 +995,20 @@ class FatigueMonitor:
         phase = self.phase
         # Puerta de estabilidad: cabeza quieta y, si ya hay orientación, de frente
         is_stable = self.stability.update(face, 0.0 if self.pose_frontal else float("inf"))
+
+        if phase == self.FASE_MARCAS:
+            # Calibración manual: se acumulan los frames de los tramos marcados por el investigador
+            # (sin puerta de estabilidad: el tramo lo eligió una persona; la mediana absorbe frames sueltos)
+            n0, n1, c0, c1, _ = calibration_marks.frame_ranges(self.manual_marks)
+            index = self.frames_total - 1
+            if n0 <= index <= n1:
+                self.profile.add_sample(ear, mouth, ipd, shape, auto_finish=False)
+                if self._last_axes is not None:
+                    self._pose_samples.append(self._last_axes)
+            elif c0 <= index <= c1:
+                self.profile.add_manual_closed_sample(ear)
+            self._write_trace(now, left_ear, right_ear, ear, mouth)
+            return False, False
 
         if phase == self.FASE_ROSTRO:
             # Paso 1: perfil neutro y postura de referencia, solo con frames estables
@@ -904,11 +1051,16 @@ class FatigueMonitor:
                       f"({self.profile.closed_ear_level / self.profile.open_ear_baseline:.0%} del ojo abierto, {measured})")
                 self._log_event("CALIBRACION_CIERRE" if self.profile.closed_level_measured else "CALIBRACION_CIERRE_RESERVA",
                                 self.perclos_val, self.has_glasses, self.profile.closed_ear_level)
-                lowest = self.profile.closed_phase_min_ratio
-                if lowest is not None and lowest > self.CLOSURE_VISIBLE_MAX_RATIO:
-                    print(f"[AVISO] Con los ojos cerrados la malla solo bajó al {lowest:.0%} de la apertura normal: "
-                          f"el cierre del párpado apenas se registra. PERCLOS y micro-sueño NO serán fiables en "
-                          f"esta sesión (revisa luz, distancia, gafas o refine_landmarks).")
+                self._warn_if_closure_not_visible()
+            self._write_trace(now, left_ear, right_ear, ear, mouth)
+            return False, False
+
+        if phase == self.FASE_REAPERTURA:
+            # Paso 2b: no se cuenta nada hasta que el sujeto abre los ojos tras el paso de ojos cerrados
+            opened = self.profile.closure(ear) < self.REOPEN_MAX_CLOSURE
+            self._reopen_streak = self._reopen_streak + 1 if opened else 0
+            if self._reopen_streak >= self.REOPEN_FRAMES:
+                self._start_monitoring(now)
             self._write_trace(now, left_ear, right_ear, ear, mouth)
             return False, False
 
@@ -990,6 +1142,21 @@ class FatigueMonitor:
         fps = self.session.current_fps if self.session else None
         if fps:
             cv2.putText(img, f"{fps:.0f} FPS", (panel_w - 60, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
+        self._draw_clock(img)
+
+    def _draw_clock(self, img):
+        """Tiempo de la sesión (= columna t de traza.csv y t_s de eventos.csv; en un vídeo, el segundo de
+        la grabación) y número de frame, para anotar a mano el momento de un evento y buscarlo en la traza."""
+        h, w, _ = img.shape
+        minutes, seconds = divmod(self._now, 60)
+        lines = [f"t = {self._now:.2f} s  ({int(minutes):02d}:{seconds:05.2f})", f"frame {self.frames_total - 1}"]
+        if self._is_video_file():
+            lines.append("[ESPACIO] pausa")
+        x0, y0 = w - 265, 15
+        cv2.rectangle(img, (x0, y0), (w - 15, y0 + 22 * len(lines) + 12), (20, 20, 25), -1)
+        for i, text in enumerate(lines):
+            cv2.putText(img, text, (x0 + 12, y0 + 27 + 22 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.5 if i == 0 else 0.42,
+                        (255, 255, 255) if i == 0 else (160, 160, 170), 1)
 
     def _draw_calibration_overlay(self, img, title, progress, subtitle="MIRA AL FRENTE"):
         """Banner de la fase de calibración con barra de progreso, a la derecha del panel lateral."""
@@ -1046,7 +1213,9 @@ class FatigueMonitor:
 
         self.session = SessionRecorder(self.subject_id, self.sessions_dir, self.save_trace, self.condition,
                                        self.subject_code)
-        self.session.begin(self.video_source, clock, frame_size, native_fps, self.parameters())
+        source_type = ("video" if self._is_video_file()
+                       else "stream" if "://" in str(self.video_source) else "camara")
+        self.session.begin(self.video_source, source_type, clock, frame_size, native_fps, self.parameters())
         self.session.open_trace(self.TRACE_HEADER)
 
         while True:
@@ -1057,6 +1226,8 @@ class FatigueMonitor:
             self._now = self.frames_total / native_fps if use_video_clock else time.time() - wall_start
             self.frames_total += 1
             self.session.tick()
+            if self._manual_pending and self.frames_total - 1 >= calibration_marks.frame_ranges(self.manual_marks)[4]:
+                self._finish_manual_calibration(self._now)
 
             clean_frame = img.copy()
             img, faces = self.detector.findFaceMesh(img, draw=False)
@@ -1077,9 +1248,24 @@ class FatigueMonitor:
             elif phase == self.FASE_CIERRE:
                 self._draw_calibration_overlay(img, "PASO 2/2: CIERRA LOS OJOS...", self.profile.closed_progress,
                                                subtitle="ABRELOS AL OIR EL PITIDO")
+            elif phase == self.FASE_REAPERTURA:
+                self._draw_calibration_overlay(img, "ABRE LOS OJOS", 1.0, subtitle="EL CONTEO EMPIEZA AL ABRIRLOS")
+            elif phase == self.FASE_MARCAS:
+                start_frame = calibration_marks.frame_ranges(self.manual_marks)[4]
+                self._draw_calibration_overlay(img, "CALIBRACION MANUAL (MARCAS DEL VIDEO)",
+                                               (self.frames_total - 1) / max(start_frame, 1),
+                                               subtitle=f"LA PRUEBA EMPIEZA EN t = {self.manual_marks['inicio_prueba']['s']:.2f} s")
 
             cv2.imshow("Fatigue Framework Monitor", img)
             key = cv2.waitKey(1) & 0xFF
+            if key == ord(' ') and self._is_video_file():
+                # Pausa (solo vídeos: el reloj es el del archivo, así que pausar no altera las mediciones)
+                key = 0
+                while key not in (ord(' '), ord('q')):
+                    key = cv2.waitKey(50) & 0xFF
+                    if cv2.getWindowProperty("Fatigue Framework Monitor", cv2.WND_PROP_VISIBLE) < 1:
+                        key = ord('q')       # ventana cerrada durante la pausa
+                self.session.reset_tick()    # el tiempo en pausa no cuenta en los FPS de procesamiento
             if key == ord('q'):
                 break
             if key == ord('c'):
@@ -1093,6 +1279,8 @@ class FatigueMonitor:
         self._close_pose_interval()
         metadata = self.session.finish({
             "duracion_s": round(self._now, 2),
+            "calibracion_modo": "manual" if self.manual_marks else "automatica",
+            "inicio_monitoreo_s": None if self.test_start_s is None else round(self.test_start_s, 3),
             "frames": self.frames_total,
             "frames_con_rostro": self.frames_with_face,
             "gafas_final": self.has_glasses,
@@ -1106,6 +1294,9 @@ class FatigueMonitor:
                                           if self.blink_durations else None),
             "bostezos": self.yawn_count,
             "micro_bostezos": self.micro_yawn_count,
+            "duracion_media_bostezo_s": (round(float(np.mean(self.yawn_durations)), 4)
+                                         if self.yawn_durations else None),
+            "parpadeos_descartados_giro": self.fast_turn_rejected,
             "sonrisas_descartadas": self.smile_count,
             "tiempo_postura_fuera_de_rango_s": round(self.pose_out_time, 2),
             "perclos_final_pct": round(self.perclos_val, 2),

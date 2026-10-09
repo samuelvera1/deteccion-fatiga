@@ -13,10 +13,19 @@ resumen), eventos.csv y traza.csv, y añade una fila a sesiones/resumen_sesiones
 Con --nombre, la sesión se guarda con el nombre tal cual y, además, con un código anónimo (S01...)
 en la columna codigo_anonimo, para poder compartir los datos sin nombres si hace falta. La carpeta
 sesiones/ y participantes_privado.csv están excluidos de git: los nombres no se suben al repositorio.
+
+Para revisar una sesión de vídeo con barra de tiempo y anotar los eventos reales: ver revisar.py.
+
+Vídeos con calibración manual: si el vídeo tiene marcas (python revisar.py --video RUTA, teclas N/C/P),
+se calibra con los tramos marcados y el conteo empieza en el inicio de la prueba. --calibracion-auto
+ignora las marcas.
 """
 import argparse
 import datetime
+import os
+import sys
 
+import calibration_marks
 from fatigue_framework import FatigueMonitor
 from session_recorder import ParticipantRegistry
 
@@ -45,6 +54,8 @@ def parse_args():
                         help='resolución pedida a la cámara, ej. 1280x720 o 640x480; "nativa" para no cambiarla')
     parser.add_argument("--sin-refinar", action="store_true",
                         help="desactiva refine_landmarks de MediaPipe (solo para comparar con el modo anterior)")
+    parser.add_argument("--calibracion-auto", action="store_true",
+                        help="ignora las marcas de calibración manual del vídeo y calibra automáticamente")
     args = parser.parse_args()
     args.fuente = int(args.fuente) if args.fuente.isdigit() else args.fuente
     if args.resolucion.lower() == "nativa":
@@ -58,6 +69,25 @@ def parse_args():
     return args
 
 
+def manual_marks_for(source, ignore):
+    """Marcas de calibración manual del vídeo, validadas; None si no hay (o se ignoran)."""
+    if ignore or not isinstance(source, str) or not os.path.exists(source):
+        return None
+    marks = calibration_marks.load_marks(source)
+    if marks is None:
+        print("[CALIBRACION] El vídeo no tiene marcas: calibración automática "
+              "(para marcarlo: python revisar.py --video RUTA)")
+        return None
+    issues = calibration_marks.problems(marks)
+    if issues:
+        sys.exit("Las marcas de calibración del vídeo están incompletas: " + "; ".join(issues) +
+                 ".\nCorrígelas con revisar.py --video, o analiza con --calibracion-auto.")
+    n, c, p = marks["neutro"], marks["cerrado"], marks["inicio_prueba"]
+    print(f"[CALIBRACION] Marcas manuales: neutro {n['inicio_s']:.2f}-{n['fin_s']:.2f} s, "
+          f"ojos cerrados {c['inicio_s']:.2f}-{c['fin_s']:.2f} s, prueba desde {p['s']:.2f} s")
+    return marks
+
+
 if __name__ == "__main__":
     args = parse_args()
     subject_code = None
@@ -66,9 +96,11 @@ if __name__ == "__main__":
         args.sujeto = args.nombre
         print(f"[PARTICIPANTE] {args.nombre} (código anónimo {subject_code}{', nuevo' if is_new else ''})")
 
-    # Umbrales relativos al perfil del sujeto (calibración automática al iniciar; tecla C para recalibrar)
+    # Umbrales relativos al perfil del sujeto (calibración automática al iniciar, o manual con las marcas del
+    # vídeo; tecla C para recalibrar)
+    marks = manual_marks_for(args.fuente, args.calibracion_auto)
     monitor = FatigueMonitor(video_source=args.fuente, subject_id=args.sujeto, subject_code=subject_code,
-                             condition=args.condicion, save_trace=not args.sin_traza,
+                             manual_marks=marks, condition=args.condicion, save_trace=not args.sin_traza,
                              refine_landmarks=not args.sin_refinar, capture_size=args.resolucion)
     monitor.on_blink(registrar_parpadeo)
     monitor.on_yawn(registrar_bostezo)
@@ -82,10 +114,18 @@ if __name__ == "__main__":
     print(f"Sujeto:               {meta['sujeto']}"
           f"{' (' + meta['codigo_anonimo'] + ')' if meta['codigo_anonimo'] else ''}")
     print(f"Condición declarada:  {meta['condicion'] or '(no indicada)'}")
+    print(f"Fuente:               {meta['tipo_fuente']} ({meta['fuente']})")
     print(f"Duración:             {resumen['duracion_s']:.0f} s ({meta['reloj']})")
+    start = resumen["inicio_monitoreo_s"]
+    print(f"Calibración:          {resumen['calibracion_modo']}"
+          f"{f', conteo desde t = {start:.2f} s' if start is not None else ', el conteo no llegó a empezar'}")
     print(f"Parpadeos:            {resumen['parpadeos']} (prolongados: {resumen['parpadeos_prolongados']}, "
           f"duración media: {resumen['duracion_media_parpadeo_s'] or 0:.2f} s)")
-    print(f"Bostezos:             {resumen['bostezos']} (micro: {resumen['micro_bostezos']})")
+    print(f"Bostezos:             {resumen['bostezos']} (micro: {resumen['micro_bostezos']}, duración media "
+          f"de la apertura: {resumen['duracion_media_bostezo_s'] or 0:.2f} s)")
+    if resumen["parpadeos_descartados_giro"]:
+        print(f"Descartados por giro: {resumen['parpadeos_descartados_giro']} (caídas de apertura al girar "
+              f"rápido la cabeza, sin cierre del párpado)")
     print(f"PERCLOS final:        {resumen['perclos_final_pct']:.1f}%")
     gafas = resumen["gafas_final"]
     print(f"Gafas (declaradas):   {'(no declaradas)' if gafas is None else ('SÍ' if gafas else 'NO')}")

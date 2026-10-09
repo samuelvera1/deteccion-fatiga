@@ -20,6 +20,9 @@ participantes_privado.csv
 *.jpeg
 *.png
 *.bmp
+# Frames de los vídeos que guarda revisar.py y marcas de calibración de cada vídeo
+cache_revisor/
+*.calibracion.json
 
 # Editor / sistema
 .vscode/

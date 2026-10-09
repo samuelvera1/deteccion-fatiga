@@ -65,11 +65,13 @@ class SessionRecorder:
     Además añade una fila por sesión a sesiones/resumen_sesiones.csv para comparar sesiones y sujetos.
     """
 
+    # t_s: tiempo de la sesión (en un vídeo, segundo dentro de la grabación); Timestamp: hora del análisis
     EVENT_HEADER = ["t_s", "Timestamp", "Evento", "Fase", "PERCLOS_Pct", "Modo_Gafas", "Apertura_Ocular_IPD",
-                    "Duracion_s"]
-    SUMMARY_HEADER = ["sesion_id", "sujeto", "codigo_anonimo", "condicion", "inicio", "duracion_s", "fuente",
-                      "commit", "cambios_sin_commit", "gafas_final", "parpadeos", "parpadeos_prolongados",
-                      "proporcion_parpadeos_prolongados", "duracion_media_parpadeo_s", "bostezos", "micro_bostezos",
+                    "Duracion_s", "Tipo_Fuente"]
+    SUMMARY_HEADER = ["sesion_id", "sujeto", "codigo_anonimo", "condicion", "inicio", "duracion_s", "tipo_fuente",
+                      "fuente", "commit", "cambios_sin_commit", "gafas_final", "parpadeos", "parpadeos_prolongados",
+                      "proporcion_parpadeos_prolongados", "duracion_media_parpadeo_s", "parpadeos_descartados_giro",
+                      "bostezos", "micro_bostezos", "duracion_media_bostezo_s",
                       "sonrisas_descartadas", "tiempo_postura_fuera_de_rango_s",
                       "perclos_final_pct", "recalibraciones", "frames", "frames_con_rostro", "fps_medio",
                       "cpu_proceso_pct", "ram_proceso_mb"]
@@ -88,6 +90,7 @@ class SessionRecorder:
         self.dir = os.path.join(base_dir, self.session_id)
         os.makedirs(self.dir, exist_ok=True)
         self.save_trace = save_trace
+        self.source_type = ""          # lo fija begin()
 
         self._events_file = open(os.path.join(self.dir, "eventos.csv"), "w", newline="", encoding="utf-8")
         self._events = csv.writer(self._events_file)
@@ -143,9 +146,12 @@ class SessionRecorder:
 
     # ------------------------------------------------------------------ ciclo de la sesión
 
-    def begin(self, source, clock, frame_size, native_fps, parameters):
+    def begin(self, source, source_type, clock, frame_size, native_fps, parameters):
+        """source_type: "camara" (en vivo), "video" (archivo grabado) o "stream" (URL)."""
+        self.source_type = source_type
         self.metadata.update({
             "fuente": str(source),
+            "tipo_fuente": source_type,
             "reloj": clock,
             "resolucion": list(frame_size) if frame_size else None,
             "fps_nativo_fuente": native_fps,
@@ -169,6 +175,10 @@ class SessionRecorder:
             self._frame_times.append(now - self._last_tick)
         self._last_tick = now
 
+    def reset_tick(self):
+        """Tras una pausa: el siguiente frame no mide intervalo (la pausa no es tiempo de procesamiento)."""
+        self._last_tick = None
+
     @property
     def current_fps(self):
         recent = self._frame_times[-30:]
@@ -180,7 +190,7 @@ class SessionRecorder:
         glasses = "NO_DECLARADO" if has_glasses is None else ("ACTIVO" if has_glasses else "INACTIVO")
         self._events.writerow([f"{t:.3f}", datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3], event, phase,
                                f"{perclos:.2f}", glasses, f"{ear:.4f}",
-                               "" if duration is None else f"{duration:.3f}"])
+                               "" if duration is None else f"{duration:.3f}", self.source_type])
         self._events_file.flush()
 
     def open_trace(self, header):
@@ -232,10 +242,11 @@ class SessionRecorder:
             if new_file:
                 writer.writerow(self.SUMMARY_HEADER)
             writer.writerow([m["sesion_id"], m["sujeto"], m["codigo_anonimo"], m["condicion"], m["inicio"],
-                             r["duracion_s"], m["fuente"],
+                             r["duracion_s"], m["tipo_fuente"], m["fuente"],
                              m["git"]["commit"], bool(m["git"]["cambios_sin_commit"]), r["gafas_final"],
                              r["parpadeos"], r["parpadeos_prolongados"], r["proporcion_parpadeos_prolongados"],
-                             r["duracion_media_parpadeo_s"], r["bostezos"], r["micro_bostezos"],
+                             r["duracion_media_parpadeo_s"], r.get("parpadeos_descartados_giro"),
+                             r["bostezos"], r["micro_bostezos"], r.get("duracion_media_bostezo_s"),
                              r["sonrisas_descartadas"], r["tiempo_postura_fuera_de_rango_s"], r["perclos_final_pct"],
                              r["recalibraciones"], r["frames"], r["frames_con_rostro"],
                              perf["fps_procesamiento_medio"], perf["cpu_proceso_pct_medio"], perf["ram_proceso_mb_media"]])
@@ -251,6 +262,11 @@ class SessionRecorder:
             header = next(csv.reader(f), None)
         if header == self.SUMMARY_HEADER:
             return
+        for row in rows:
+            if not row.get("tipo_fuente"):   # sesiones anteriores a la columna: se deduce de la fuente
+                source = row.get("fuente") or ""
+                row["tipo_fuente"] = ("camara" if source.isdigit() else "stream" if "://" in source
+                                      else "video" if source else "")
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=self.SUMMARY_HEADER, extrasaction="ignore")
             writer.writeheader()
