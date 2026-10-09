@@ -8,13 +8,16 @@ Revisión de vídeos con barra de tiempo. Dos modos:
      N marca inicio y fin del tramo neutro, C inicio y fin del tramo con ojos cerrados y P el inicio de
      la prueba. Se guardan junto al vídeo (<video>.calibracion.json) y main.py las usa al analizarlo.
 
-  2. Revisar una sesión ya analizada y anotar los eventos reales (referencia para la validación):
-         python revisar.py "sesiones/20261008_134740_Samuel_Vera"
-         python revisar.py "sesiones/20261008_134740_Samuel_Vera" --ciego --anotador "Ana"
-     --ciego oculta lo detectado por el sistema (la referencia debe anotarse sin verlo).
+  2. Revisar una sesión ya analizada y anotar los eventos reales:
+         python revisar.py "sesiones/<sesion>" --ciego    # REFERENCIA -> anotaciones_ciego.csv
+         python revisar.py "sesiones/<sesion>"            # revisión   -> anotaciones_revision.csv
+     La referencia para la validación se anota siempre con --ciego (oculta lo detectado por el sistema),
+     siguiendo docs/guia_anotacion.md. Sin --ciego es una revisión para encontrar errores, no referencia.
      B / Y / K / M anotan parpadeo / bostezo / micro-bostezo / micro-sueño como intervalo (tecla al
-     inicio y otra vez al final). X marca un tramo con un PROBLEMA (error del sistema, cara tapada, mala luz...) y pide un
-     comentario. Se guardan en anotaciones_<anotador>.csv de la sesión.
+     inicio y otra vez al final). X marca un tramo y pide un comentario: con --ciego es NO_EVALUABLE (cara
+     tapada, fuera de cuadro...; la evaluación lo excluye); sin --ciego, PROBLEMA (nota de un error).
+     --anotador NOMBRE solo hace falta si anota otra persona además del anotador principal (acuerdo entre
+     anotadores): sus anotaciones van a anotaciones_ciego_NOMBRE.csv.
 
 El análisis (main.py) recorre el vídeo de principio a fin porque tiene memoria (referencia local del
 parpadeo, ventana de 60 s del PERCLOS, contadores): saltar dentro del análisis falsearía los resultados.
@@ -68,16 +71,31 @@ NEUTRAL_COLOR, CLOSED_COLOR = (80, 200, 80), (200, 90, 170)
 ANNOTATION_KEYS = {ord("b"): "PARPADEO", ord("y"): "BOSTEZO", ord("k"): "MICRO_BOSTEZO",
                    ord("m"): "MICRO_SUENO", ord("x"): "PROBLEMA"}
 PROBLEM_COLOR = (0, 140, 255)
+# En modo ciego (referencia) la X marca un tramo NO_EVALUABLE: algo que impide ver los ojos o la boca (cara
+# tapada, fuera de cuadro...). Se decide solo por lo que se ve, sin ver el sistema, y la evaluación excluye
+# ese tramo. Fuera del modo ciego la X es un PROBLEMA (nota para el análisis de errores).
+COMMENTED_TYPES = {"PROBLEMA", "NO_EVALUABLE"}
 MAX_COMMENT = 60
 # Todas las anotaciones son intervalos (tecla al inicio y otra vez al final): así la referencia humana
 # tiene duración, comparable con la Duracion_s del sistema (también la del parpadeo, ~0.1-0.4 s).
-INTERVAL_TYPES = set(ANNOTATION_KEYS.values())
-KEY_FOR_TYPE = {kind: chr(key).upper() for key, kind in ANNOTATION_KEYS.items()}
-ANNOTATION_HEADER = ["t_s", "frame", "tipo", "fin_t_s", "fin_frame", "comentario", "anotador", "registrado"]
+INTERVAL_TYPES = set(ANNOTATION_KEYS.values()) | {"NO_EVALUABLE"}
+KEY_FOR_TYPE = {**{kind: chr(key).upper() for key, kind in ANNOTATION_KEYS.items()}, "NO_EVALUABLE": "X"}
+# ciego: 1 si la anotación se hizo en modo ciego (sin ver al sistema). Solo esas sirven de referencia.
+ANNOTATION_HEADER = ["t_s", "frame", "tipo", "fin_t_s", "fin_frame", "comentario", "ciego", "anotador",
+                     "registrado"]
 
 
 def safe_name(text):
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in text)
+
+
+def annotations_file(session_dir, blind, annotator=None):
+    """anotaciones_ciego.csv (referencia, modo ciego) o anotaciones_revision.csv (revisión viendo el sistema).
+    annotator: solo para un anotador adicional al principal (acuerdo entre anotadores) -> ..._NOMBRE.csv."""
+    name = "anotaciones_" + ("ciego" if blind else "revision")
+    if annotator:
+        name += "_" + safe_name(annotator)
+    return os.path.join(session_dir, name + ".csv")
 
 
 class FrameStore:
@@ -505,11 +523,21 @@ class SessionReviewer(Viewer):
             sys.exit(f"No se encuentra el vídeo de la sesión: {source}")
         super().__init__(source)
         self.fps = self.meta.get("fps_nativo_fuente") or self.fps
-        self.dir, self.blind, self.annotator = session_dir, blind, annotator
+        self.dir, self.blind = session_dir, blind
+        self.annotator = annotator or "principal"
         self.trace = self._load_trace()
         self.events = self._load_events()
-        self.annotations_path = os.path.join(session_dir, f"anotaciones_{safe_name(annotator)}.csv")
+        self.annotations_path = annotations_file(session_dir, blind, annotator)
+        legacy = os.path.join(session_dir, "anotaciones_revisor.csv")   # nombre por defecto de versiones anteriores
+        if not blind and annotator is None and os.path.exists(legacy) and not os.path.exists(self.annotations_path):
+            os.replace(legacy, self.annotations_path)
+            print("[AVISO] anotaciones_revisor.csv (versión anterior, hechas viendo el sistema) se renombró a "
+                  "anotaciones_revision.csv")
         self.annotations = self._load_annotations()
+        mode = "1" if blind else "0"
+        if any(a["ciego"] != mode for a in self.annotations):
+            sys.exit(f"{os.path.basename(self.annotations_path)} contiene anotaciones hechas "
+                     f"{'SIN' if blind else 'EN'} modo ciego: la referencia y la revisión no se mezclan.")
         self.pending = None             # intervalo con inicio marcado y sin fin
         self.comment_for, self.comment_text = None, ""   # PROBLEMA cuyo comentario se está escribiendo
 
@@ -539,8 +567,10 @@ class SessionReviewer(Viewer):
         if not os.path.exists(self.annotations_path):
             return []
         with open(self.annotations_path, newline="", encoding="utf-8") as f:
+            # Archivos anteriores a la columna "ciego": se consideran NO ciegos (no consta que lo fueran)
             return [{**a, "frame": int(a["frame"]),
-                     "fin_frame": int(a["fin_frame"]) if a.get("fin_frame") else None}
+                     "fin_frame": int(a["fin_frame"]) if a.get("fin_frame") else None,
+                     "ciego": a.get("ciego") or "0"}
                     for a in csv.DictReader(f)]
 
     def _save_annotations(self):
@@ -560,6 +590,8 @@ class SessionReviewer(Viewer):
     def handle_key(self, key):
         if key in ANNOTATION_KEYS:
             kind = ANNOTATION_KEYS[key]
+            if kind == "PROBLEMA" and self.blind:
+                kind = "NO_EVALUABLE"
             if kind in INTERVAL_TYPES and self.pending is None:
                 self.pending = {"tipo": kind, "frame": self.pos}    # inicio; falta el fin
                 return True
@@ -567,7 +599,7 @@ class SessionReviewer(Viewer):
                 start, end = sorted((self.pending["frame"], self.pos))
                 self.pending = None
                 self._add_annotation(kind, start, end)
-                if kind == "PROBLEMA":          # pedir el comentario en la ventana
+                if kind in COMMENTED_TYPES:     # pedir el comentario en la ventana
                     self.playing = False
                     self.comment_for, self.comment_text = self.annotations[-1], ""
             elif kind in INTERVAL_TYPES:                            # otro intervalo abierto: se reemplaza
@@ -582,6 +614,13 @@ class SessionReviewer(Viewer):
             if not self.annotations:
                 return True
             self.annotations.pop()      # la lista está en orden de anotación (el archivo se guarda ordenado aparte)
+        elif key == ord("e"):
+            # borra la anotación que contiene el frame actual (si hay varias, la más reciente)
+            here = [a for a in self.annotations
+                    if a["frame"] <= self.pos <= (a["frame"] if a.get("fin_frame") is None else a["fin_frame"])]
+            if not here:
+                return True
+            self.annotations.remove(here[-1])
         else:
             return False
         self._save_annotations()
@@ -590,7 +629,7 @@ class SessionReviewer(Viewer):
     def _add_annotation(self, kind, start, end):
         self.annotations.append({"t_s": f"{self.t(start):.3f}", "frame": start, "tipo": kind,
                                  "fin_t_s": "" if end is None else f"{self.t(end):.3f}", "fin_frame": end,
-                                 "comentario": "", "anotador": self.annotator,
+                                 "comentario": "", "ciego": "1" if self.blind else "0", "anotador": self.annotator,
                                  "registrado": datetime.now().isoformat(timespec="seconds")})
 
     def typing(self):
@@ -636,14 +675,14 @@ class SessionReviewer(Viewer):
 
     def draw_dynamic_rows(self, bar, width):
         for a in self.annotations:
-            color = PROBLEM_COLOR if a["tipo"] == "PROBLEMA" else WHITE
+            color = PROBLEM_COLOR if a["tipo"] in COMMENTED_TYPES else WHITE
             xs = self.frame_to_x(a["frame"], width)
             if a.get("fin_frame") is None:
                 cv2.line(bar, (xs, 77), (xs, 92), color, 2)
             else:
                 cv2.rectangle(bar, (xs, 77), (max(self.frame_to_x(a["fin_frame"], width), xs + 2), 92), color, -1)
         if self.pending is not None:    # intervalo a medio marcar: contorno hasta el cursor
-            color = PROBLEM_COLOR if self.pending["tipo"] == "PROBLEMA" else WHITE
+            color = PROBLEM_COLOR if self.pending["tipo"] in COMMENTED_TYPES else WHITE
             xs, xe = sorted((self.frame_to_x(self.pending["frame"], width), self.frame_to_x(self.pos, width)))
             cv2.rectangle(bar, (xs, 77), (max(xe, xs + 1), 92), color, 1)
 
@@ -691,13 +730,14 @@ class SessionReviewer(Viewer):
         mine = [a for a in self.annotations if near_me(a)]
         items += [("sep",), ("h", f"TUS ANOTACIONES ({len(self.annotations)} en total)")]
         if self.comment_for is not None:
-            items += [("t", "DESCRIBE EL PROBLEMA (sin tildes):", PROBLEM_COLOR),
+            prompt = "MOTIVO: cara tapada, fuera de cuadro..." if self.blind else "DESCRIBE EL PROBLEMA"
+            items += [("t", f"{prompt} (sin tildes):", PROBLEM_COLOR),
                       ("big", (self.comment_text + "_")[-34:], WHITE),
                       ("t", "ENTER guardar   ESC sin comentario   BORRAR letra", GRAY)]
         if self.pending is not None:
             items.append(("t", f"{self.pending['tipo']} desde {self.t(self.pending['frame']):.2f} s: "
                                f"pulsa {KEY_FOR_TYPE[self.pending['tipo']]} en el final", WARN_COLOR))
-        items += ([("t", describe(a), PROBLEM_COLOR if a["tipo"] == "PROBLEMA" else WHITE) for a in mine[:2]]
+        items += ([("t", describe(a), PROBLEM_COLOR if a["tipo"] in COMMENTED_TYPES else WHITE) for a in mine[:2]]
                   or [("t", "ninguna cerca de este momento", DIM)])
         items += [("sep",), ("h", "COLORES DE LA BARRA")]
         if not self.blind:
@@ -709,7 +749,8 @@ class SessionReviewer(Viewer):
                       ("legend", [("bostezo", EVENT_COLORS["BOSTEZO"]), ("micro-bostezo", EVENT_COLORS["MICRO_BOSTEZO"]),
                                   ("sonrisa", EVENT_COLORS["SONRISA"]),
                                   ("descartado (giro)", EVENT_COLORS["PARPADEO_DESCARTADO_GIRO"])])]
-        items += [("legend", [("blanco = tus anotaciones", WHITE), ("naranja = problema", PROBLEM_COLOR)]),
+        items += [("legend", [("blanco = tus anotaciones", WHITE),
+                              ("naranja = no evaluable" if self.blind else "naranja = problema", PROBLEM_COLOR)]),
                   ("sep",)]
         items += self.navigation_items() + [
             ("sep",), ("h", "ANOTAR LO QUE VES: tecla al INICIO y otra al FIN"),
@@ -717,8 +758,9 @@ class SessionReviewer(Viewer):
             ("key", "Y", "bostezo: empieza a abrir la boca / la cierra"),
             ("key", "K", "micro-bostezo (contenido, boca poco abierta)"),
             ("key", "M", "micro-sueno: cierra los ojos / los abre"),
-            ("key", "X", "PROBLEMA en ese tramo (luego escribes que)"),
-            ("key", "U / Q", "borrar la ultima / salir (todo se guarda)")]
+            ("key", "X", "NO EVALUABLE: cara tapada, fuera de cuadro..." if self.blind
+             else "PROBLEMA en ese tramo (luego escribes que)"),
+            ("key", "U / E / Q", "borra la ultima / la de aqui / salir")]
         return items
 
     def on_exit(self):
@@ -736,7 +778,9 @@ def parse_args():
     parser.add_argument("sesion", nargs="?", help="carpeta de la sesión analizada (sesiones/<fecha>_<sujeto>)")
     parser.add_argument("--video", help="vídeo sin analizar: marcar la calibración manual (N / C / P)")
     parser.add_argument("--ciego", action="store_true", help="ocultar lo detectado por el sistema")
-    parser.add_argument("--anotador", default="revisor", help="nombre de quien anota")
+    parser.add_argument("--anotador", default=None,
+                        help="solo si anota OTRA persona además del anotador principal (para medir el acuerdo "
+                             "entre anotadores); sus anotaciones van a un archivo aparte")
     args = parser.parse_args()
     if args.sesion and not args.video and os.path.isfile(args.sesion):
         args.video, args.sesion = args.sesion, None   # se pasó la ruta de un vídeo sin --video

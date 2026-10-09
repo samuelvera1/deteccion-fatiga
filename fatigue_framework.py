@@ -522,6 +522,7 @@ class FatigueMonitor:
         self.blink_had_microsleep = False     # el episodio en curso llegó a micro-sueño
         self.blink_peak_seen = False          # el parpadeo en curso ya llegó a cierre completo
         self.blink_split = None               # reapertura parcial pendiente dentro de una ráfaga
+        self.blink_in_burst = False           # el cierre en curso empezó en una reapertura parcial (ráfaga)
         self.blink_ref = None
         self._ear_history = deque()           # (t, apertura) del último segundo, para la referencia local
         self._last_blink_ref = None
@@ -879,7 +880,7 @@ class FatigueMonitor:
         if self.blink_closed:
             if self.blink_closed_frames == 0:
                 self.blink_dip, self.blink_started, self.blink_had_microsleep = ear, now, False
-                self.blink_peak_seen, self.blink_split = False, None
+                self.blink_peak_seen, self.blink_split, self.blink_in_burst = False, None, False
                 self.blink_max_head_speed = 0.0
             self.blink_dip = min(self.blink_dip, ear)
             self.blink_max_head_speed = max(self.blink_max_head_speed, self.head_speed or 0.0)
@@ -887,7 +888,10 @@ class FatigueMonitor:
             if self.profile.closed_level_measured:
                 self._split_burst(ear, ref, yawn_blocks_blinks, now)
         elif self.blink_closed_frames > 0:
-            self._classify_closure_episode(ear, ref, yawn_blocks_blinks, now, self.blink_closed_frames, self.blink_dip)
+            # El último parpadeo de una ráfaga también es "de ráfaga": el periodo refractario que activó el
+            # anterior no debe anularlo (antes se perdía si duraba < 3 frames tras la reapertura parcial)
+            self._classify_closure_episode(ear, ref, yawn_blocks_blinks, now, self.blink_closed_frames, self.blink_dip,
+                                           in_burst=self.blink_in_burst)
             self.blink_closed_frames = 0
 
         if self.blink_refractory > 0:
@@ -914,6 +918,7 @@ class FatigueMonitor:
                                            in_burst=True)
             self.blink_started, self.blink_closed_frames = split_t, frames_after + 1
             self.blink_dip, self.blink_peak_seen, self.blink_split = min(dip_after, ear), True, None
+            self.blink_in_burst = True
         else:
             self.blink_split[3], self.blink_split[4] = frames_after + 1, min(dip_after, ear)
 
@@ -937,16 +942,19 @@ class FatigueMonitor:
             self._log_event("PARPADEO_DESCARTADO_GIRO", self.perclos_val, self.has_glasses, ear, duration,
                             end_time=end_time)
             return
+        # end_time: en una ráfaga, el parpadeo termina en la reapertura parcial (anterior al frame actual);
+        # registrarlo en el frame actual desplazaba su intervalo [t_s - duración, t_s] unas décimas
         if duration < self.LONG_BLINK_SECONDS:
             self.blink_count += 1
             self.blink_durations.append(duration)
-            self._log_event("PARPADEO", self.perclos_val, self.has_glasses, ear, duration)
+            self._log_event("PARPADEO", self.perclos_val, self.has_glasses, ear, duration, end_time=end_time)
             if self._on_blink:
                 self._on_blink(self.blink_count)
         elif self.profile.closure(dip) >= self.LONG_BLINK_MIN_CLOSURE:
             self.long_blink_count += 1
             self.blink_durations.append(duration)
-            self._log_event("PARPADEO_PROLONGADO", self.perclos_val, self.has_glasses, ear, duration)
+            self._log_event("PARPADEO_PROLONGADO", self.perclos_val, self.has_glasses, ear, duration,
+                            end_time=end_time)
         else:
             return                            # entrecerrar los ojos: ni parpadeo ni cierre
         self.blink_refractory = self.BLINK_REFRACTORY_FRAMES

@@ -15,6 +15,7 @@ en la columna codigo_anonimo, para poder compartir los datos sin nombres si hace
 sesiones/ y participantes_privado.csv están excluidos de git: los nombres no se suben al repositorio.
 
 Para revisar una sesión de vídeo con barra de tiempo y anotar los eventos reales: ver revisar.py.
+Para medir el sistema contra esas anotaciones: ver evaluar.py y docs/guia_anotacion.md.
 
 Vídeos con calibración manual: si el vídeo tiene marcas (python revisar.py --video RUTA, teclas N/C/P),
 se calibra con los tramos marcados y el conteo empieza en el inicio de la prueba. --calibracion-auto
