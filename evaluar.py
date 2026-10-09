@@ -291,6 +291,11 @@ class Reference:
             self.warnings.append(f"{points} anotaciones sin fin (formato antiguo): se tratan como instantes")
         if notes:
             self.warnings.append(f"{notes} anotaciones PROBLEMA (notas de revisión) no se usan en la evaluación")
+        long_blinks = [e for e in self.events if e["tipo"] == "PARPADEO" and e["fin"] - e["inicio"] >= 1.0]
+        if long_blinks:
+            self.warnings.append(f"{len(long_blinks)} parpadeos anotados duran 1 s o más ("
+                                 + ", ".join(f"{e['inicio']:.2f} s" for e in long_blinks[:5])
+                                 + "): según la guía, con los ojos cerrados del todo 1 s o más es un cierre largo (M)")
         for cls in CLASSES:
             spans = sorted((e["inicio"], e["fin"]) for e in self.events if e["clase"] == cls)
             duplicated = sum(1 for a, b in zip(spans, spans[1:]) if b[0] <= a[1])
