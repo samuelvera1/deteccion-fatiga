@@ -3,6 +3,7 @@ import csv
 import json
 import os
 import platform
+import queue
 import subprocess
 import sys
 import threading
@@ -12,6 +13,58 @@ from datetime import datetime
 import cv2
 import numpy as np
 import psutil
+
+
+class FrameRecorder:
+    """
+    Grabación de una sesión EN VIVO (main.py --grabar) para anotarla después con revisar.py: guarda cada
+    frame que procesó el sistema, en orden, y el instante de cada uno (tiempos_frames.csv). El frame N de
+    la grabación es el frame N de la traza, así que lo que se anota se compara exactamente con lo que el
+    sistema detectó en vivo (incluidos los frames que la cámara entregó tarde o que se perdieron).
+    La escritura va en un hilo aparte para no frenar el análisis; ningún frame se descarta: si el disco no
+    da abasto, el análisis espera.
+    """
+
+    VIDEO_NAME = "grabacion.mp4"
+    TIMES_NAME = "tiempos_frames.csv"
+
+    def __init__(self, session_dir, frame_size, fps):
+        self.size, self.fps = tuple(int(v) for v in frame_size), float(fps or 30.0)
+        self.writer = cv2.VideoWriter(os.path.join(session_dir, self.VIDEO_NAME), cv2.VideoWriter_fourcc(*"mp4v"),
+                                      self.fps, self.size)
+        if not self.writer.isOpened():
+            raise RuntimeError("no se pudo crear el archivo de la grabación")
+        self._times_file = open(os.path.join(session_dir, self.TIMES_NAME), "w", newline="", encoding="utf-8")
+        self._times = csv.writer(self._times_file)
+        self._times.writerow(["frame", "t"])
+        self.count = 0
+        self._queue = queue.Queue(maxsize=90)
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def write(self, frame, t):
+        self._queue.put((frame, t))
+
+    def _run(self):
+        while True:
+            item = self._queue.get()
+            if item is None:
+                break
+            frame, t = item
+            if (frame.shape[1], frame.shape[0]) != self.size:
+                frame = cv2.resize(frame, self.size)
+            self.writer.write(frame)
+            self._times.writerow([self.count, f"{t:.4f}"])
+            self.count += 1
+
+    def close(self):
+        """Termina de escribir y devuelve la descripción para metadata.json."""
+        self._queue.put(None)
+        self._thread.join()
+        self.writer.release()
+        self._times_file.close()
+        return {"archivo": self.VIDEO_NAME, "tiempos": self.TIMES_NAME, "frames": self.count,
+                "fps_nominal": self.fps, "codec": "mp4v", "resolucion": list(self.size)}
 
 
 class ParticipantRegistry:

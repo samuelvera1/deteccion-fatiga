@@ -156,6 +156,11 @@ class Session:
         trace_path = os.path.join(path, "traza.csv")
         self.trace = self._load_trace(trace_path) if os.path.exists(trace_path) else []
         self.trace_t = [r["t"] for r in self.trace]
+        # Sesión en vivo grabada (main.py --grabar): instante real de cada frame
+        self.frame_times = None
+        recording = self.meta.get("grabacion")
+        if recording and os.path.exists(os.path.join(path, recording["tiempos"])):
+            self.frame_times = [float(r["t"]) for r in read_csv(os.path.join(path, recording["tiempos"]))]
         self.start = self.summary.get("inicio_monitoreo_s")
         if self.start is None:      # sesiones anteriores a ese campo: primer frame en monitoreo
             self.start = next((r["t"] for r in self.trace if r["fase"] == "monitoreo"), None)
@@ -169,7 +174,8 @@ class Session:
             t = to_float(r.get("t"))
             if t is None:
                 continue
-            rows.append({"t": t, "fase": r.get("fase", ""), "cerrado": r.get("eyes_closed") == "1",
+            rows.append({"t": t, "frame": int(r["frame"]) if r.get("frame") else None,
+                         "fase": r.get("fase", ""), "cerrado": r.get("eyes_closed") == "1",
                          "postura_valida": r.get("postura_valida") == "1", "cierre": to_float(r.get("cierre")),
                          "boca": to_float(r.get("mouth")), "vel": to_float(r.get("cabeza_vel"))})
         return sorted(rows, key=lambda r: r["t"])
@@ -215,7 +221,9 @@ class Session:
             if r["fase"] != "monitoreo":
                 previous = None
                 continue
-            if previous is not None and r["t"] - previous["t"] > 1.5 * dt:
+            # Frames sin rostro: salto en el número de frame (en vivo los frames no llegan a intervalos fijos)
+            if previous is not None and (r["frame"] - previous["frame"] > 1 if r["frame"] is not None
+                                         and previous["frame"] is not None else r["t"] - previous["t"] > 1.5 * dt):
                 intervals.append((previous["t"] + dt, r["t"]))
             if not r["postura_valida"]:
                 intervals.append((r["t"], r["t"] + dt))
@@ -431,10 +439,12 @@ def landis_koch(kappa):
 def agreement(session, ref_a, ref_b):
     """Kappa de Cohen frame a frame y F1 por evento entre dos anotadores (guía, sección 5)."""
     exclusions = [(s, e) for s, e, _ in ref_a.not_evaluable + ref_b.not_evaluable] + session.not_counting_intervals()
-    n_frames = int(round(session.end * session.fps)) if session.end else 0
-    first = int(math.ceil(session.start * session.fps)) if session.start is not None else n_frames
-    frames = [f for f in range(first, n_frames)
-              if not any(s <= f / session.fps <= e for s, e in exclusions)]
+    if session.frame_times:          # sesión en vivo: instante real de cada frame
+        times = session.frame_times
+    else:
+        times = [f / session.fps for f in range(int(round(session.end * session.fps)) if session.end else 0)]
+    start = session.start if session.start is not None else float("inf")
+    frames = [t for t in times if t >= start and not any(s <= t <= e for s, e in exclusions)]
     result = {}
     for cls in CLASSES:
         a = [e for e in ref_a.events if e["clase"] == cls and e["inicio"] >= (session.start or 0)
@@ -442,8 +452,8 @@ def agreement(session, ref_a, ref_b):
         b = [e for e in ref_b.events if e["clase"] == cls and e["inicio"] >= (session.start or 0)
              and not any(overlaps(e["inicio"], e["fin"], s, t) for s, t in exclusions)]
         pairs = match(b, a, TOLERANCE_S[cls])
-        label_a = [any(e["inicio"] <= f / session.fps <= e["fin"] for e in a) for f in frames]
-        label_b = [any(e["inicio"] <= f / session.fps <= e["fin"] for e in b) for f in frames]
+        label_a = [any(e["inicio"] <= t <= e["fin"] for e in a) for t in frames]
+        label_b = [any(e["inicio"] <= t <= e["fin"] for e in b) for t in frames]
         kappa = cohen_kappa(label_a, label_b)
         tp = len(pairs)
         result[cls] = {"eventos_" + ref_a.name: len(a), "eventos_" + ref_b.name: len(b), "coinciden": tp,

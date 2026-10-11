@@ -5,7 +5,7 @@ import time
 from collections import deque
 import calibration_marks
 from fatigue_core import FaceMeshDetector
-from session_recorder import SessionRecorder
+from session_recorder import FrameRecorder, SessionRecorder
 
 
 class SubjectProfile:
@@ -328,7 +328,7 @@ class FatigueMonitor:
     PERCLOS_ALERT_PCT = 22.0
 
     def __init__(self, video_source=0, subject_id="anonimo", condition=None, save_trace=True, sessions_dir="sesiones",
-                 subject_code=None, manual_marks=None,
+                 subject_code=None, manual_marks=None, record=False,
                  refine_landmarks=True, capture_size=(1280, 720),
                  yawn_factor=1.65, yawn_min_delta=0.25, yawn_min_seconds=0.5,
                  micro_yawn_factor=1.30, micro_yawn_min_delta=0.15, micro_yawn_min_seconds=0.35,
@@ -340,6 +340,9 @@ class FatigueMonitor:
         self.subject_code = subject_code      # código anónimo (S01...) guardado junto al nombre
         # Marcas de calibración manual del vídeo (calibration_marks), ya validadas; None = automática
         self.manual_marks = manual_marks
+        # Sesión en vivo con grabación (--grabar): para anotarla después y evaluar el sistema en tiempo real
+        self.record = record
+        self.recorder = None
         self._manual_pending = manual_marks is not None
         self.test_start_s = None              # inicio del monitoreo (s), para el resumen
         self.save_trace = save_trace
@@ -1225,6 +1228,11 @@ class FatigueMonitor:
                        else "stream" if "://" in str(self.video_source) else "camara")
         self.session.begin(self.video_source, source_type, clock, frame_size, native_fps, self.parameters())
         self.session.open_trace(self.TRACE_HEADER)
+        if self.record and self._is_video_file():
+            print("[AVISO] --grabar es para sesiones en vivo: el vídeo analizado ya es la grabación. Se ignora.")
+        elif self.record:
+            self.recorder = FrameRecorder(self.session.dir, frame_size, native_fps)
+            print(f"[GRABACION] Se guarda lo que ve la cámara en {self.session.dir} (para anotarlo después)")
 
         while True:
             success, img = cap.read()
@@ -1238,6 +1246,8 @@ class FatigueMonitor:
                 self._finish_manual_calibration(self._now)
 
             clean_frame = img.copy()
+            if self.recorder:
+                self.recorder.write(clean_frame, self._now)   # clean_frame no se modifica después
             img, faces = self.detector.findFaceMesh(img, draw=False)
 
             is_microsleep_active, is_yawning_active = False, False
@@ -1281,6 +1291,9 @@ class FatigueMonitor:
 
         cap.release()
         cv2.destroyAllWindows()
+        if self.recorder:
+            print("[GRABACION] Terminando de guardar el vídeo...")
+            self.session.metadata["grabacion"] = self.recorder.close()
         self._finish_session(native_fps, use_video_clock)
 
     def _finish_session(self, native_fps, use_video_clock):

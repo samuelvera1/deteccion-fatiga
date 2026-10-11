@@ -7,6 +7,7 @@ Uso:
     python main.py --nombre "Samuel Vera" --condicion con_gafas   # sesión guardada con el nombre
     python main.py --sujeto S01 --condicion con_gafas  # registra la condición experimental declarada
     python main.py --sin-traza                       # no guarda las métricas por frame
+    python main.py --nombre "..." --condicion sin_gafas --grabar   # prueba EN VIVO grabada para anotarla
 
 Cada ejecución crea sesiones/<fecha>_<sujeto>/ con metadata.json (commit, parámetros, FPS, CPU/RAM,
 resumen), eventos.csv y traza.csv, y añade una fila a sesiones/resumen_sesiones.csv.
@@ -51,6 +52,9 @@ def parse_args():
                         help="condición experimental declarada (ej. con_gafas, sin_gafas); se guarda en los metadatos")
     parser.add_argument("--fuente", default="0", help="índice de cámara (0, 1...) o ruta de un vídeo")
     parser.add_argument("--sin-traza", action="store_true", help="no guardar las métricas por frame")
+    parser.add_argument("--grabar", action="store_true",
+                        help="sesión en vivo: guarda lo que ve la cámara (grabacion.mp4) para anotarlo después con "
+                             "revisar.py y evaluar el sistema en tiempo real")
     parser.add_argument("--resolucion", default="1280x720",
                         help='resolución pedida a la cámara, ej. 1280x720 o 640x480; "nativa" para no cambiarla')
     parser.add_argument("--sin-refinar", action="store_true",
@@ -102,7 +106,8 @@ if __name__ == "__main__":
     marks = manual_marks_for(args.fuente, args.calibracion_auto)
     monitor = FatigueMonitor(video_source=args.fuente, subject_id=args.sujeto, subject_code=subject_code,
                              manual_marks=marks, condition=args.condicion, save_trace=not args.sin_traza,
-                             refine_landmarks=not args.sin_refinar, capture_size=args.resolucion)
+                             refine_landmarks=not args.sin_refinar, capture_size=args.resolucion,
+                             record=args.grabar)
     monitor.on_blink(registrar_parpadeo)
     monitor.on_yawn(registrar_bostezo)
     monitor.start()
@@ -137,3 +142,6 @@ if __name__ == "__main__":
     print(f"Commit:               {meta['git']['commit']}")
     print("=" * 50)
     print(f"\nDatos guardados en '{monitor.session.dir}'.")
+    if meta.get("grabacion"):
+        print(f"Grabación: {meta['grabacion']['frames']} frames. Para anotarla:\n"
+              f'  python revisar.py "{monitor.session.dir}" --ciego')

@@ -33,6 +33,7 @@ vez abra en ~1 s (en un vídeo de 33 s a 720p: ~31 s cargando frame a frame fren
 Interfaz: se dibuja con Pillow y fuentes TrueType (revisar_ui.py).
 """
 import argparse
+import bisect
 import copy
 import csv
 import json
@@ -252,7 +253,12 @@ class Viewer:
     # ------------------------------------------------------------------ navegación
 
     def t(self, frame=None):
+        """Instante (s) de un frame. En un vídeo, frame / fps; en una sesión en vivo grabada, el reloj real."""
         return (self.pos if frame is None else frame) / self.fps
+
+    def frame_at(self, seconds):
+        """Frame correspondiente a un instante (inversa de t)."""
+        return seconds * self.fps
 
     def seek(self, frame):
         self.pos = int(np.clip(frame, 0, self.store.total - 1))
@@ -313,12 +319,12 @@ class Viewer:
             c.text(x0 - 12, (top + bottom) / 2, name, c.fonts.small, ui.MUTED, anchor="rm")
         self.draw_static_rows(c, rows, width)
         # Escala de tiempo: una marca cada 1, 2, 5, 10... s, con al menos 56 px entre etiquetas
-        duration = (self.store.total - 1) / self.fps
+        duration = self.t(self.store.total - 1)
         px_per_s = (x1 - x0) / max(duration, 1e-6)
         step = next((s for s in (1, 2, 5, 10, 15, 30, 60, 120, 300) if s * px_per_s >= 56), 600)
         second = 0
         while second <= duration + 1e-6:
-            x = self.frame_to_x(second * self.fps, width)
+            x = self.frame_to_x(self.frame_at(second), width)
             c.draw.line((x, axis_y, x, axis_y + 4), fill=ui.FAINT)
             c.text(x, axis_y + 6, f"{second // 60}:{second % 60:02d}", c.fonts.small, ui.FAINT, anchor="ma")
             second += step
@@ -649,8 +655,14 @@ class SessionReviewer(Viewer):
         with open(os.path.join(session_dir, "metadata.json"), encoding="utf-8") as f:
             self.meta = json.load(f)
         source = str(self.meta.get("fuente", ""))
-        if self.meta.get("tipo_fuente") == "camara" or source.isdigit():
-            sys.exit("Esta sesión fue con la cámara en vivo: no hay vídeo que revisar.")
+        recording = self.meta.get("grabacion")
+        self.frame_times = None         # instante real de cada frame (sesiones en vivo grabadas)
+        if recording:                   # sesión en vivo con --grabar: se revisa la grabación
+            source = os.path.join(session_dir, recording["archivo"])
+            with open(os.path.join(session_dir, recording["tiempos"]), newline="", encoding="utf-8") as f:
+                self.frame_times = [float(r["t"]) for r in csv.DictReader(f)]
+        elif self.meta.get("tipo_fuente") == "camara" or source.isdigit():
+            sys.exit("Esta sesión fue en vivo sin grabar: no hay vídeo que revisar (usa main.py --grabar).")
         if not os.path.exists(source):
             sys.exit(f"No se encuentra el vídeo de la sesión: {source}")
         super().__init__(source)
@@ -766,6 +778,17 @@ class SessionReviewer(Viewer):
                                  "comentario": "", "ciego": "1" if self.blind else "0", "anotador": self.annotator,
                                  "registrado": datetime.now().isoformat(timespec="seconds")})
 
+    def t(self, frame=None):
+        if self.frame_times:            # sesión en vivo: los frames no llegan a intervalos exactos
+            index = int(np.clip(self.pos if frame is None else frame, 0, len(self.frame_times) - 1))
+            return self.frame_times[index]
+        return super().t(frame)
+
+    def frame_at(self, seconds):
+        if self.frame_times:
+            return bisect.bisect_left(self.frame_times, seconds)
+        return super().frame_at(seconds)
+
     def typing(self):
         return self.comment_for is not None
 
@@ -807,7 +830,7 @@ class SessionReviewer(Viewer):
 
     def _long_blink(self, a):
         return (a["tipo"] == "PARPADEO" and a.get("fin_frame") is not None
-                and (a["fin_frame"] - a["frame"]) / self.fps >= LONG_BLINK_NOTICE_S)
+                and self.t(a["fin_frame"]) - self.t(a["frame"]) >= LONG_BLINK_NOTICE_S)
 
     def _near_me(self, a):
         end = a["fin_frame"] if a.get("fin_frame") is not None else a["frame"]
@@ -983,8 +1006,8 @@ class SessionReviewer(Viewer):
         if "sistema" in rows:
             top, bottom = rows["sistema"]
             for start, end, kind in self.events:
-                xs = self.frame_to_x(start * self.fps, width)
-                xe = max(self.frame_to_x(end * self.fps, width), xs + 3)
+                xs = self.frame_to_x(self.frame_at(start), width)
+                xe = max(self.frame_to_x(self.frame_at(end), width), xs + 3)
                 c.draw.rounded_rectangle((xs, top, xe, bottom), radius=2, fill=ui.EVENT_COLORS[kind])
 
     def draw_dynamic_rows(self, c, rows, width):
