@@ -4,6 +4,7 @@ import numpy as np
 import time
 from collections import deque
 import calibration_marks
+from kss import KSSPrompter
 from fatigue_core import FaceMeshDetector
 from session_recorder import FrameRecorder, SessionRecorder
 
@@ -328,7 +329,7 @@ class FatigueMonitor:
     PERCLOS_ALERT_PCT = 22.0
 
     def __init__(self, video_source=0, subject_id="anonimo", condition=None, save_trace=True, sessions_dir="sesiones",
-                 subject_code=None, manual_marks=None, record=False,
+                 subject_code=None, manual_marks=None, record=False, kss_interval_min=None,
                  refine_landmarks=True, capture_size=(1280, 720),
                  yawn_factor=1.65, yawn_min_delta=0.25, yawn_min_seconds=0.5,
                  micro_yawn_factor=1.30, micro_yawn_min_delta=0.15, micro_yawn_min_seconds=0.35,
@@ -343,6 +344,8 @@ class FatigueMonitor:
         # Sesión en vivo con grabación (--grabar): para anotarla después y evaluar el sistema en tiempo real
         self.record = record
         self.recorder = None
+        # Escala de somnolencia de Karolinska durante la sesión en vivo (referencia para validar la fatiga)
+        self.kss = KSSPrompter(kss_interval_min) if kss_interval_min else None
         self._manual_pending = manual_marks is not None
         self.test_start_s = None              # inicio del monitoreo (s), para el resumen
         self.save_trace = save_trace
@@ -465,6 +468,7 @@ class FatigueMonitor:
                         "ventana_s": self.window_seconds, "denominador_minimo_s": self.perclos_min_seconds,
                         "ponderado_por_tiempo": True,
                         "hud_precaucion_pct": self.PERCLOS_WARN_PCT, "hud_alerta_pct": self.PERCLOS_ALERT_PCT},
+            "kss": self.kss.parameters() if self.kss else {"activa": False},
             "gafas": {"origen": "condición declarada por el investigador (--condicion)",
                       "declaradas": self.has_glasses,
                       "cambio_a_mitad_de_sesion": "recalibrar con la tecla C"},
@@ -474,11 +478,11 @@ class FatigueMonitor:
                         "fuera_de_rango": "no se cuentan parpadeos ni PERCLOS; micro-sueño sí (marcado)"},
         }
 
-    def _log_event(self, event_type, perclos_val, has_glasses, ear_val, duration=None, end_time=None):
+    def _log_event(self, event_type, perclos_val, has_glasses, ear_val, duration=None, end_time=None, value=None):
         """end_time: instante en que terminó el evento si no es el frame actual (t_s = fin del evento)."""
         if self.session:
             self.session.log_event(self._now if end_time is None else end_time, event_type, self.phase,
-                                   perclos_val, has_glasses, ear_val, duration)
+                                   perclos_val, has_glasses, ear_val, duration, value)
 
     def _write_trace(self, now, left_ear, right_ear, ear, mouth):
         if not (self.session and self.session.save_trace):
@@ -566,6 +570,16 @@ class FatigueMonitor:
         self.recalibration_count += 1
         print(f"[CALIBRACION] Recalibrando perfil facial ({reason})")
         self._log_event("RECALIBRACION", self.perclos_val, self.has_glasses, 0.0)
+
+    def _ask_kss(self, moment):
+        self.kss.ask(moment, self._now)
+        self._log_event("KSS_PREGUNTA", self.perclos_val, self.has_glasses, 0.0)
+
+    def _answer_kss(self, value):
+        response = self.kss.answer(value, self._now)
+        # Duracion_s = latencia de la respuesta; Valor = puntaje KSS (1-9)
+        self._log_event("KSS", self.perclos_val, self.has_glasses, 0.0, response["latencia_s"], value=value)
+        print(f"[KSS] {value} ({response['momento']}, t = {response['t_respuesta']:.1f} s)")
 
     def _start_monitoring(self, now):
         self._monitoring_started = True
@@ -1211,6 +1225,9 @@ class FatigueMonitor:
         return actual
 
     def start(self):
+        if self.kss and self._is_video_file():
+            print("[AVISO] --kss es para sesiones en vivo (la persona responde en el momento). Se ignora.")
+            self.kss = None
         cap = cv2.VideoCapture(self.video_source)
         frame_size = self._configure_camera(cap)
         native_fps = cap.get(cv2.CAP_PROP_FPS) or None
@@ -1258,6 +1275,9 @@ class FatigueMonitor:
             else:
                 self.stability.reset()   # al volver el rostro se exigen de nuevo 15 frames estables
 
+            if self.kss and self._monitoring_started and self.kss.due(self._now):
+                self._ask_kss("inicio" if not self.kss.responses else "periodica")
+
             # Renderizado del HUD Limpio
             self._draw_hud(img, self.perclos_val, self.has_glasses, is_microsleep_active, is_yawning_active)
             phase = self.phase
@@ -1274,6 +1294,8 @@ class FatigueMonitor:
                                                (self.frames_total - 1) / max(start_frame, 1),
                                                subtitle=f"LA PRUEBA EMPIEZA EN t = {self.manual_marks['inicio_prueba']['s']:.2f} s")
 
+            if self.kss and self.kss.prompt:
+                self.kss.draw(img)
             cv2.imshow("Fatigue Framework Monitor", img)
             key = cv2.waitKey(1) & 0xFF
             if key == ord(' ') and self._is_video_file():
@@ -1284,7 +1306,16 @@ class FatigueMonitor:
                     if cv2.getWindowProperty("Fatigue Framework Monitor", cv2.WND_PROP_VISIBLE) < 1:
                         key = ord('q')       # ventana cerrada durante la pausa
                 self.session.reset_tick()    # el tiempo en pausa no cuenta en los FPS de procesamiento
+            if self.kss and self.kss.prompt and ord('1') <= key <= ord('9'):
+                self._answer_kss(key - ord('0'))
+                if self.kss.quit_after:
+                    break                   # respondida la pregunta final: termina la sesión
+                continue
             if key == ord('q'):
+                if self.kss and self._monitoring_started and not self.kss.final_done and not self.kss.quit_after:
+                    self._ask_kss("final")  # antes de salir, la última respuesta (Q otra vez: salir sin ella)
+                    self.kss.quit_after = True
+                    continue
                 break
             if key == ord('c'):
                 self.recalibrate("manual", full=True)
@@ -1301,6 +1332,7 @@ class FatigueMonitor:
         metadata = self.session.finish({
             "duracion_s": round(self._now, 2),
             "calibracion_modo": "manual" if self.manual_marks else "automatica",
+            "kss": self.kss.responses if self.kss else None,
             "inicio_monitoreo_s": None if self.test_start_s is None else round(self.test_start_s, 3),
             "frames": self.frames_total,
             "frames_con_rostro": self.frames_with_face,

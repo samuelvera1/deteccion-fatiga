@@ -120,7 +120,7 @@ class SessionRecorder:
 
     # t_s: tiempo de la sesión (en un vídeo, segundo dentro de la grabación); Timestamp: hora del análisis
     EVENT_HEADER = ["t_s", "Timestamp", "Evento", "Fase", "PERCLOS_Pct", "Modo_Gafas", "Apertura_Ocular_IPD",
-                    "Duracion_s", "Tipo_Fuente"]
+                    "Duracion_s", "Tipo_Fuente", "Valor"]
     SUMMARY_HEADER = ["sesion_id", "sujeto", "codigo_anonimo", "condicion", "inicio", "duracion_s", "tipo_fuente",
                       "fuente", "commit", "cambios_sin_commit", "gafas_final", "parpadeos", "parpadeos_prolongados",
                       "proporcion_parpadeos_prolongados", "duracion_media_parpadeo_s", "parpadeos_descartados_giro",
@@ -237,13 +237,15 @@ class SessionRecorder:
         recent = self._frame_times[-30:]
         return 1.0 / float(np.mean(recent)) if recent else None
 
-    def log_event(self, t, event, phase, perclos, has_glasses, ear, duration=None):
+    def log_event(self, t, event, phase, perclos, has_glasses, ear, duration=None, value=None):
         """duration: duración del evento en s (parpadeos, micro-sueño); vacío si no aplica.
-        has_glasses: condición declarada (True/False) o None si no se indicó."""
+        has_glasses: condición declarada (True/False) o None si no se indicó.
+        value: valor asociado al evento (respuesta de la KSS); vacío si no aplica."""
         glasses = "NO_DECLARADO" if has_glasses is None else ("ACTIVO" if has_glasses else "INACTIVO")
         self._events.writerow([f"{t:.3f}", datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3], event, phase,
                                f"{perclos:.2f}", glasses, f"{ear:.4f}",
-                               "" if duration is None else f"{duration:.3f}", self.source_type])
+                               "" if duration is None else f"{duration:.3f}", self.source_type,
+                               "" if value is None else value])
         self._events_file.flush()
 
     def open_trace(self, header):

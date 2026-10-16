@@ -8,6 +8,7 @@ Uso:
     python main.py --sujeto S01 --condicion con_gafas  # registra la condición experimental declarada
     python main.py --sin-traza                       # no guarda las métricas por frame
     python main.py --nombre "..." --condicion sin_gafas --grabar   # prueba EN VIVO grabada para anotarla
+    python main.py --nombre "..." --condicion sin_gafas --grabar --kss   # + escala de somnolencia cada 5 min
 
 Cada ejecución crea sesiones/<fecha>_<sujeto>/ con metadata.json (commit, parámetros, FPS, CPU/RAM,
 resumen), eventos.csv y traza.csv, y añade una fila a sesiones/resumen_sesiones.csv.
@@ -52,6 +53,9 @@ def parse_args():
                         help="condición experimental declarada (ej. con_gafas, sin_gafas); se guarda en los metadatos")
     parser.add_argument("--fuente", default="0", help="índice de cámara (0, 1...) o ruta de un vídeo")
     parser.add_argument("--sin-traza", action="store_true", help="no guardar las métricas por frame")
+    parser.add_argument("--kss", nargs="?", const=5.0, type=float, default=None, metavar="MIN",
+                        help="sesión en vivo: pregunta la escala de somnolencia de Karolinska (1-9) al empezar, cada "
+                             "MIN minutos (5 si no se indica) y al terminar")
     parser.add_argument("--grabar", action="store_true",
                         help="sesión en vivo: guarda lo que ve la cámara (grabacion.mp4) para anotarlo después con "
                              "revisar.py y evaluar el sistema en tiempo real")
@@ -107,7 +111,7 @@ if __name__ == "__main__":
     monitor = FatigueMonitor(video_source=args.fuente, subject_id=args.sujeto, subject_code=subject_code,
                              manual_marks=marks, condition=args.condicion, save_trace=not args.sin_traza,
                              refine_landmarks=not args.sin_refinar, capture_size=args.resolucion,
-                             record=args.grabar)
+                             record=args.grabar, kss_interval_min=args.kss)
     monitor.on_blink(registrar_parpadeo)
     monitor.on_yawn(registrar_bostezo)
     monitor.start()
@@ -136,6 +140,9 @@ if __name__ == "__main__":
     gafas = resumen["gafas_final"]
     print(f"Gafas (declaradas):   {'(no declaradas)' if gafas is None else ('SÍ' if gafas else 'NO')}")
     print(f"Recalibraciones:      {resumen['recalibraciones']}")
+    if resumen.get("kss"):
+        print("Somnolencia (KSS):    " + ", ".join(f"{r['valor']} ({r['momento']}, {r['t_respuesta']:.0f} s)"
+                                                    for r in resumen["kss"]))
     print(f"FPS de procesamiento: {rendimiento['fps_procesamiento_medio']}")
     print(f"CPU del proceso:      {rendimiento['cpu_proceso_pct_medio']}%")
     print(f"RAM del proceso:      {rendimiento['ram_proceso_mb_media']} MB")
