@@ -85,6 +85,14 @@ class SubjectProfile:
         self._set_closed_level(float(np.median(self._closed_samples)), measured=True)
         return True
 
+    def closed_samples_enough(self, min_samples=10):
+        return len(self._closed_samples) >= min_samples
+
+    def restart_closed_phase(self):
+        """Nuevo intento del paso de ojos cerrados: descarta lo acumulado en el intento fallido."""
+        self._closed_samples = []
+        self.closed_phase_ratios = []
+
     def finish_closed_on_timeout(self, fallback_ratio, min_samples=10):
         """Tiempo agotado: con >= min_samples frames cerrados se usa su mediana (medido); si no, el
         valor de reserva fallback_ratio x ojo abierto (no medido)."""
@@ -225,6 +233,10 @@ class FatigueMonitor:
     # 0.25 es el mínimo del único parpadeo completo observado en la sesión 20261005_231802.
     CLOSED_CAPTURE_FACTOR = 0.6
     CLOSED_CALIBRATION_TIMEOUT = 10.0
+    # En vivo, si en un intento no se detectan los ojos cerrados, el paso se repite solo (hasta
+    # CLOSED_MAX_ATTEMPTS intentos, con CLOSED_RETRY_PAUSE s entre ellos) antes de usar la reserva
+    CLOSED_MAX_ATTEMPTS = 3
+    CLOSED_RETRY_PAUSE = 3.0
     CLOSED_FALLBACK_RATIO = 0.25
     # Si con los ojos cerrados la apertura no baja de este nivel, el cierre apenas es visible en la malla
     CLOSURE_VISIBLE_MAX_RATIO = 0.6
@@ -438,6 +450,8 @@ class FatigueMonitor:
                             "frames_ojo_cerrado": self.profile.closed_frames,
                             "captura_ojo_cerrado_factor": self.CLOSED_CAPTURE_FACTOR,
                             "timeout_ojo_cerrado_s": self.CLOSED_CALIBRATION_TIMEOUT,
+                            "intentos_ojo_cerrado_en_vivo": self.CLOSED_MAX_ATTEMPTS,
+                            "pausa_entre_intentos_s": self.CLOSED_RETRY_PAUSE,
                             "reserva_ojo_cerrado_ratio": self.CLOSED_FALLBACK_RATIO,
                             "cierre_visible_max_ratio": self.CLOSURE_VISIBLE_MAX_RATIO,
                             "reapertura_cierre_max": self.REOPEN_MAX_CLOSURE,
@@ -548,6 +562,8 @@ class FatigueMonitor:
         self.blink_max_head_speed = 0.0       # giro de cabeza máximo (°/s) durante el cierre en curso
         self.yawn_smile_seen = False          # el episodio en curso tuvo forma de sonrisa
         self._closed_phase_started = None
+        self._closed_attempt = 1              # intento actual del paso de ojos cerrados
+        self._closed_retry_until = None       # fin de la pausa antes del siguiente intento
         self._reopen_streak = 0
         self._monitoring_started = False
 
@@ -644,6 +660,16 @@ class FatigueMonitor:
         if "con" in text and "gafas" in text:
             return True
         return None
+
+    @staticmethod
+    def _retry_beep():
+        """Dos tonos graves, distintos del pitido agudo de 'abre los ojos': el intento no salió, mira la pantalla."""
+        try:
+            import winsound
+            winsound.Beep(500, 180)
+            winsound.Beep(400, 260)
+        except Exception:
+            print("\a\a", end="", flush=True)
 
     @staticmethod
     def _beep():
@@ -1073,13 +1099,34 @@ class FatigueMonitor:
 
         if phase == self.FASE_CIERRE:
             # Paso 2: nivel de ojo cerrado del sujeto (cierra los ojos hasta oír el pitido)
+            if self._closed_retry_until is not None:
+                # pausa entre intentos: la persona abre los ojos, lee el aviso y se prepara
+                if now < self._closed_retry_until:
+                    self._write_trace(now, left_ear, right_ear, ear, mouth)
+                    return False, False
+                self._closed_retry_until, self._closed_phase_started = None, now
             if self._closed_phase_started is None:
                 self._closed_phase_started = now
             self.profile.observe_closed_phase(ear)
             done = False
             if ear < self.profile.open_ear_baseline * self.CLOSED_CAPTURE_FACTOR:
                 done = self.profile.add_closed_sample(ear)
-            if not done and now - self._closed_phase_started > self.CLOSED_CALIBRATION_TIMEOUT:
+            timed_out = not done and now - self._closed_phase_started > self.CLOSED_CALIBRATION_TIMEOUT
+            if (timed_out and not self.profile.closed_samples_enough() and not self._is_video_file()
+                    and self._closed_attempt < self.CLOSED_MAX_ATTEMPTS):
+                # En vivo, sin ojos cerrados detectados: se repite el paso en vez de usar el valor de reserva
+                # (con la reserva, PERCLOS, micro-sueño y alertas no funcionan; sesión 20261017_111619)
+                self._closed_attempt += 1
+                self.profile.restart_closed_phase()
+                self._closed_retry_until = now + self.CLOSED_RETRY_PAUSE
+                self._retry_beep()
+                print(f"[PASO 2] No se detectaron los ojos cerrados: intento {self._closed_attempt} de "
+                      f"{self.CLOSED_MAX_ATTEMPTS} en {self.CLOSED_RETRY_PAUSE:.0f} s")
+                self._log_event("CALIBRACION_CIERRE_REINTENTO", self.perclos_val, self.has_glasses, 0.0,
+                                value=self._closed_attempt)
+                self._write_trace(now, left_ear, right_ear, ear, mouth)
+                return False, False
+            if timed_out:
                 self.profile.finish_closed_on_timeout(self.CLOSED_FALLBACK_RATIO)
                 done = True
                 if not self.profile.closed_level_measured:
@@ -1355,8 +1402,14 @@ class FatigueMonitor:
             phase = self.phase
             if phase == self.FASE_ROSTRO:
                 self._draw_calibration_overlay(img, "PASO 1/2: ANALIZANDO ROSTRO...", self.profile.progress)
+            elif phase == self.FASE_CIERRE and self._closed_retry_until is not None:
+                remaining = max(0.0, self._closed_retry_until - self._now)
+                self._draw_calibration_overlay(
+                    img, "NO SE DETECTARON LOS OJOS CERRADOS", 1.0 - remaining / self.CLOSED_RETRY_PAUSE,
+                    subtitle=f"CIERRALOS DEL TODO EN {remaining:.0f} s  (INTENTO {self._closed_attempt}/{self.CLOSED_MAX_ATTEMPTS})")
             elif phase == self.FASE_CIERRE:
-                self._draw_calibration_overlay(img, "PASO 2/2: CIERRA LOS OJOS...", self.profile.closed_progress,
+                attempt = f" (INTENTO {self._closed_attempt}/{self.CLOSED_MAX_ATTEMPTS})" if self._closed_attempt > 1 else ""
+                self._draw_calibration_overlay(img, "PASO 2/2: CIERRA LOS OJOS..." + attempt, self.profile.closed_progress,
                                                subtitle="ABRELOS AL OIR EL PITIDO")
             elif phase == self.FASE_REAPERTURA:
                 self._draw_calibration_overlay(img, "ABRE LOS OJOS", 1.0, subtitle="EL CONTEO EMPIEZA AL ABRIRLOS")
