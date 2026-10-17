@@ -328,6 +328,7 @@ class FatigueMonitor:
     # Colores del HUD para PERCLOS: los mismos umbrales que las alertas (fatigue_alert.py, de la literatura)
     PERCLOS_WARN_PCT = FatigueAlert.CAUTION_PCT
     PERCLOS_ALERT_PCT = FatigueAlert.DROWSY_PCT
+    PERCLOS_BAR_MAX = 30.0    # tope de la barra del panel (solo visualización)
 
     def __init__(self, video_source=0, subject_id="anonimo", condition=None, save_trace=True, sessions_dir="sesiones",
                  subject_code=None, manual_marks=None, record=False, kss_interval_min=None, alert_sound=True,
@@ -561,6 +562,18 @@ class FatigueMonitor:
         if not self._monitoring_started:
             return self.FASE_REAPERTURA
         return self.FASE_MONITOREO
+
+    @property
+    def closure_reliable(self):
+        """El % de cierre (y con él PERCLOS, micro-sueño, parpadeos prolongados y alertas) solo es fiable si el
+        nivel de ojo cerrado se midió y la malla registró el cierre del párpado. Con el valor de reserva, el
+        ojo cerrado real queda muy por encima del supuesto y el cierre no llega al 80 % (sesión
+        20261017_111619: ojos casi abiertos durante el paso de cierre, cierre máximo 0.56, PERCLOS 0)."""
+        p = self.profile
+        if not p.closed_level_measured:
+            return False
+        lowest = p.closed_phase_min_ratio
+        return lowest is None or lowest <= self.CLOSURE_VISIBLE_MAX_RATIO
 
     def recalibrate(self, reason, full=False):
         """Descarta el perfil y reinicia el pipeline desde el paso 1.
@@ -1129,6 +1142,10 @@ class FatigueMonitor:
         cv2.putText(img, "PARPADEOS", (30, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
         cv2.putText(img, f"{self.blink_count}", (30, 115), cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 200, 0), 2)
         cv2.putText(img, f"prolong. {self.long_blink_count}", (70, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
+        if self.blink_durations:
+            # Duración del último parpadeo: prolongado si dura >= LONG_BLINK_SECONDS con cierre completo
+            cv2.putText(img, f"ultimo {self.blink_durations[-1]:.2f} s (prolong. >= {self.LONG_BLINK_SECONDS:.1f} s)",
+                        (30, 129), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (120, 120, 130), 1)
 
         cv2.putText(img, "BOSTEZOS", (140, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
         cv2.putText(img, f"{self.yawn_count}", (140, 115), cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 230, 255), 2)
@@ -1149,18 +1166,30 @@ class FatigueMonitor:
 
         # Tarjeta 3: Indicador PERCLOS con Barra de Progreso
         cv2.putText(img, "PERCLOS (FATIGA)", (30, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
-        if self.perclos_total_time < self.perclos_min_seconds:
+        reliable = self.closure_reliable
+        if self.phase == self.FASE_MONITOREO and not reliable:
+            cv2.putText(img, "NO FIABLE", (160, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 140, 255), 1)
+        elif self.perclos_total_time < self.perclos_min_seconds:
             cv2.putText(img, "calibrando", (160, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
 
         color_perclos = ((0, 255, 120) if perclos_val < self.PERCLOS_WARN_PCT
                          else ((0, 200, 255) if perclos_val < self.PERCLOS_ALERT_PCT else (0, 0, 255)))
+        if not reliable:
+            color_perclos = (120, 120, 130)
         cv2.putText(img, f"{perclos_val:.1f}%", (30, 260), cv2.FONT_HERSHEY_DUPLEX, 0.8, color_perclos, 2)
 
-        # Barra de progreso
+        # Barra de 0 a PERCLOS_BAR_MAX % (en una escala de 0-100 % los valores habituales, 0-15 %, casi no se
+        # veían), con rayas en los umbrales de precaución y somnolencia
         bar_x, bar_y, bar_w, bar_h = 30, 275, panel_w - 60, 10
         cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (50, 50, 60), -1)
-        fill_w = int((min(perclos_val, 100.0) / 100.0) * bar_w)
+        fill_w = int(min(perclos_val / self.PERCLOS_BAR_MAX, 1.0) * bar_w)
         cv2.rectangle(img, (bar_x, bar_y), (bar_x + fill_w, bar_y + bar_h), color_perclos, -1)
+        for pct in (self.PERCLOS_WARN_PCT, self.PERCLOS_ALERT_PCT):
+            x = bar_x + int(pct / self.PERCLOS_BAR_MAX * bar_w)
+            cv2.line(img, (x, bar_y - 3), (x, bar_y + bar_h + 3), (230, 230, 235), 1)
+            cv2.putText(img, f"{pct:.0f}", (x - 5, bar_y + bar_h + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (150, 150, 160), 1)
+        cv2.putText(img, f"{self.PERCLOS_BAR_MAX:.0f}%", (bar_x + bar_w - 20, bar_y + bar_h + 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.32, (110, 110, 120), 1)
 
         # Alertas de Eventos Críticos
         if is_microsleep:
@@ -1173,9 +1202,20 @@ class FatigueMonitor:
         # Nivel de fatiga (alertas en vivo)
         level = self.alert.level
         cv2.putText(img, "NIVEL DE FATIGA", (30, 380), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
-        cv2.putText(img, level.replace("_", "-"), (30, 405), cv2.FONT_HERSHEY_DUPLEX, 0.6, COLORS_BGR[level], 1)
+        if level == NORMAL and self.phase == self.FASE_MONITOREO and not reliable:
+            # sin cierre fiable el PERCLOS no puede subir: "normal" no significaría nada (el micro-sueño sí se muestra)
+            cv2.putText(img, "SIN DATOS FIABLES", (30, 405), cv2.FONT_HERSHEY_DUPLEX, 0.6, (120, 120, 130), 1)
+        else:
+            cv2.putText(img, level.replace("_", "-"), (30, 405), cv2.FONT_HERSHEY_DUPLEX, 0.6, COLORS_BGR[level], 1)
         if level != NORMAL:
             self._draw_fatigue_banner(img, level)
+        if self.phase == self.FASE_MONITOREO and not reliable:
+            # Sin el nivel de ojo cerrado medido, el % de cierre no llega al 80 %: PERCLOS, micro-sueño, parpadeos
+            # prolongados y alertas quedan en 0 aunque la persona cierre los ojos
+            for i, text in enumerate(["OJO CERRADO NO MEDIDO:", "PERCLOS y alertas no fiables.",
+                                      "Pulsa C y cierra los ojos", "hasta oir el pitido."]):
+                cv2.putText(img, text, (30, 440 + 18 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.42,
+                            (0, 140, 255) if i == 0 else (200, 200, 210), 1)
 
         cv2.putText(img, "[C] recalibrar  [Q] salir", (30, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
         if self.phase == self.FASE_MONITOREO and not self.eye_pose_valid:
