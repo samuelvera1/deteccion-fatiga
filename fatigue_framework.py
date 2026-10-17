@@ -5,6 +5,7 @@ import time
 from collections import deque
 import calibration_marks
 from kss import KSSPrompter
+from fatigue_alert import FatigueAlert, MESSAGES, COLORS_BGR, NORMAL
 from fatigue_core import FaceMeshDetector
 from session_recorder import FrameRecorder, SessionRecorder
 
@@ -324,12 +325,12 @@ class FatigueMonitor:
 
     IPD_SMOOTHING = 0.2       # EMA: la IPD es rígida, solo cambia con la distancia a la cámara
 
-    # Colores del HUD para PERCLOS: SIN respaldo en la literatura encontrada (solo visualización)
-    PERCLOS_WARN_PCT = 15.0
-    PERCLOS_ALERT_PCT = 22.0
+    # Colores del HUD para PERCLOS: los mismos umbrales que las alertas (fatigue_alert.py, de la literatura)
+    PERCLOS_WARN_PCT = FatigueAlert.CAUTION_PCT
+    PERCLOS_ALERT_PCT = FatigueAlert.DROWSY_PCT
 
     def __init__(self, video_source=0, subject_id="anonimo", condition=None, save_trace=True, sessions_dir="sesiones",
-                 subject_code=None, manual_marks=None, record=False, kss_interval_min=None,
+                 subject_code=None, manual_marks=None, record=False, kss_interval_min=None, alert_sound=True,
                  refine_landmarks=True, capture_size=(1280, 720),
                  yawn_factor=1.65, yawn_min_delta=0.25, yawn_min_seconds=0.5,
                  micro_yawn_factor=1.30, micro_yawn_min_delta=0.15, micro_yawn_min_seconds=0.35,
@@ -346,6 +347,8 @@ class FatigueMonitor:
         self.recorder = None
         # Escala de somnolencia de Karolinska durante la sesión en vivo (referencia para validar la fatiga)
         self.kss = KSSPrompter(kss_interval_min) if kss_interval_min else None
+        # Nivel de fatiga y alertas en vivo (fatigue_alert.py); el sonido se desactiva al analizar vídeos
+        self.alert = FatigueAlert(window_seconds, sound=alert_sound)
         self._manual_pending = manual_marks is not None
         self.test_start_s = None              # inicio del monitoreo (s), para el resumen
         self.save_trace = save_trace
@@ -469,6 +472,7 @@ class FatigueMonitor:
                         "ponderado_por_tiempo": True,
                         "hud_precaucion_pct": self.PERCLOS_WARN_PCT, "hud_alerta_pct": self.PERCLOS_ALERT_PCT},
             "kss": self.kss.parameters() if self.kss else {"activa": False},
+            "alertas_fatiga": self.alert.parameters(),
             "gafas": {"origen": "condición declarada por el investigador (--condicion)",
                       "declaradas": self.has_glasses,
                       "cambio_a_mitad_de_sesion": "recalibrar con la tecla C"},
@@ -1093,6 +1097,11 @@ class FatigueMonitor:
         is_yawning, yawn_blocks_blinks = self._update_yawn(mouth, now, ear, shape)
         pose_valid = self._track_pose_range(now)
         is_microsleep = self._update_eyes(ear, yawn_blocks_blinks, False, now, pose_valid)
+        level = self.alert.update(now, self.perclos_val, self.perclos_total_time, is_microsleep)
+        if level is not None:
+            self._log_event("NIVEL_FATIGA", self.perclos_val, self.has_glasses, ear, value=level)
+            if level != NORMAL:
+                print(f"[FATIGA] {MESSAGES[level]} (PERCLOS {self.perclos_val:.1f} %, t = {now:.1f} s)")
         self._write_trace(now, left_ear, right_ear, ear, mouth)
         return is_microsleep, is_yawning
 
@@ -1161,6 +1170,13 @@ class FatigueMonitor:
             cv2.rectangle(img, (30, 310), (panel_w - 15, 350), (0, 150, 255), -1)
             cv2.putText(img, "BOSTEZANDO...", (45, 335), cv2.FONT_HERSHEY_DUPLEX, 0.55, (255, 255, 255), 1)
 
+        # Nivel de fatiga (alertas en vivo)
+        level = self.alert.level
+        cv2.putText(img, "NIVEL DE FATIGA", (30, 380), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
+        cv2.putText(img, level.replace("_", "-"), (30, 405), cv2.FONT_HERSHEY_DUPLEX, 0.6, COLORS_BGR[level], 1)
+        if level != NORMAL:
+            self._draw_fatigue_banner(img, level)
+
         cv2.putText(img, "[C] recalibrar  [Q] salir", (30, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
         if self.phase == self.FASE_MONITOREO and not self.eye_pose_valid:
             cv2.putText(img, "POSTURA FUERA DE RANGO", (30, h - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 140, 255), 1)
@@ -1168,6 +1184,20 @@ class FatigueMonitor:
         if fps:
             cv2.putText(img, f"{fps:.0f} FPS", (panel_w - 60, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
         self._draw_clock(img)
+
+    def _draw_fatigue_banner(self, img, level):
+        """Aviso grande arriba al centro, a la derecha del panel."""
+        h, w, _ = img.shape
+        x0, x1, y0, y1 = 280, w - 290, 15, 70
+        if x1 - x0 < 300:
+            x0, x1 = 280, w - 15
+        overlay = img.copy()
+        cv2.rectangle(overlay, (x0, y0), (x1, y1), COLORS_BGR[level], -1)
+        cv2.addWeighted(overlay, 0.85, img, 0.15, 0, img)
+        text = MESSAGES[level]
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, 0.7, 2)
+        cv2.putText(img, text, (x0 + max(10, (x1 - x0 - tw) // 2), y0 + (y1 - y0 + th) // 2),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 2)
 
     def _draw_clock(self, img):
         """Tiempo de la sesión (= columna t de traza.csv y t_s de eventos.csv; en un vídeo, el segundo de
@@ -1228,6 +1258,8 @@ class FatigueMonitor:
         if self.kss and self._is_video_file():
             print("[AVISO] --kss es para sesiones en vivo (la persona responde en el momento). Se ignora.")
             self.kss = None
+        if self._is_video_file():
+            self.alert.sound = False      # analizando un vídeo: alertas registradas, sin sonido
         cap = cv2.VideoCapture(self.video_source)
         frame_size = self._configure_camera(cap)
         native_fps = cap.get(cv2.CAP_PROP_FPS) or None
@@ -1333,6 +1365,7 @@ class FatigueMonitor:
             "duracion_s": round(self._now, 2),
             "calibracion_modo": "manual" if self.manual_marks else "automatica",
             "kss": self.kss.responses if self.kss else None,
+            "fatiga": self.alert.summary(),
             "inicio_monitoreo_s": None if self.test_start_s is None else round(self.test_start_s, 3),
             "frames": self.frames_total,
             "frames_con_rostro": self.frames_with_face,

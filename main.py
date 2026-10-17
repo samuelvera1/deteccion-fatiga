@@ -53,6 +53,8 @@ def parse_args():
                         help="condición experimental declarada (ej. con_gafas, sin_gafas); se guarda en los metadatos")
     parser.add_argument("--fuente", default="0", help="índice de cámara (0, 1...) o ruta de un vídeo")
     parser.add_argument("--sin-traza", action="store_true", help="no guardar las métricas por frame")
+    parser.add_argument("--sin-sonido", action="store_true",
+                        help="las alertas de fatiga se muestran y registran, pero sin sonido")
     parser.add_argument("--kss", nargs="?", const=5.0, type=float, default=None, metavar="MIN",
                         help="sesión en vivo: pregunta la escala de somnolencia de Karolinska (1-9) al empezar, cada "
                              "MIN minutos (5 si no se indica) y al terminar")
@@ -111,7 +113,7 @@ if __name__ == "__main__":
     monitor = FatigueMonitor(video_source=args.fuente, subject_id=args.sujeto, subject_code=subject_code,
                              manual_marks=marks, condition=args.condicion, save_trace=not args.sin_traza,
                              refine_landmarks=not args.sin_refinar, capture_size=args.resolucion,
-                             record=args.grabar, kss_interval_min=args.kss)
+                             record=args.grabar, kss_interval_min=args.kss, alert_sound=not args.sin_sonido)
     monitor.on_blink(registrar_parpadeo)
     monitor.on_yawn(registrar_bostezo)
     monitor.start()
@@ -143,6 +145,13 @@ if __name__ == "__main__":
     if resumen.get("kss"):
         print("Somnolencia (KSS):    " + ", ".join(f"{r['valor']} ({r['momento']}, {r['t_respuesta']:.0f} s)"
                                                     for r in resumen["kss"]))
+    fatiga = resumen.get("fatiga")
+    if fatiga:
+        niveles = ", ".join(f"{k.lower().replace('_', '-')} {v:.0f} s"
+                            for k, v in fatiga["tiempo_por_nivel_s"].items() if v > 0)
+        alertas = ", ".join(f"{k.lower().replace('_', '-')} {v}" for k, v in fatiga["alertas"].items() if v)
+        print(f"Nivel de fatiga:      {niveles or '-'}")
+        print(f"Alertas:              {alertas or 'ninguna'}")
     print(f"FPS de procesamiento: {rendimiento['fps_procesamiento_medio']}")
     print(f"CPU del proceso:      {rendimiento['cpu_proceso_pct_medio']}%")
     print(f"RAM del proceso:      {rendimiento['ram_proceso_mb_media']} MB")
