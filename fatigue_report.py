@@ -89,12 +89,12 @@ def trace_row(monitor, now, left_ear, right_ear, ear, mouth):
     return [f"{now:.3f}", fmt(monitor.ipd), fmt(left_ear), fmt(right_ear), fmt(ear),
             fmt(p.open_ear_baseline), fmt(p.closed_ear_level),
             fmt(closure), int(closure is not None and closure >= monitor.P80_CLOSURE),
-            int(monitor.eyes_closed),
+            int(monitor.eyes.eyes_closed),
             fmt(mouth), fmt(p.neutral_mouth_ratio), fmt(yawn_thr), fmt(micro_thr),
             "" if monitor.has_glasses is None else int(monitor.has_glasses), monitor.phase,
             monitor.stability.stable_frames, fmt(monitor.stability.motion),
-            monitor.blink_count, monitor.yawn.count,
-            monitor.yawn.micro_count, fmt(monitor.blink_ref), int(monitor.blink_closed),
+            monitor.eyes.blink_count, monitor.yawn.count,
+            monitor.yawn.micro_count, fmt(monitor.eyes.blink_ref), int(monitor.eyes.blink_closed),
             fmt(width_rel), fmt(lift_delta), fmt(jaw_delta), int(monitor.yawn.is_smile(shape)),
             *(fmt(a) for a in (monitor.head.pose or (None, None, None))),
             int(monitor.head.eye_valid), monitor.frames_total - 1, fmt(monitor.head.speed)]
@@ -111,19 +111,19 @@ def session_summary(monitor):
         "frames": monitor.frames_total,
         "frames_con_rostro": monitor.frames_with_face,
         "gafas_final": monitor.has_glasses,
-        "parpadeos": monitor.blink_count,
-        "parpadeos_prolongados": monitor.long_blink_count,
+        "parpadeos": monitor.eyes.blink_count,
+        "parpadeos_prolongados": monitor.eyes.long_blink_count,
         # Proporción de parpadeos de cierre largo (Caffier et al., 2003) y duración media del parpadeo
         # (Ingre et al., 2006); incluyen parpadeos normales y prolongados, no micro-sueños
-        "proporcion_parpadeos_prolongados": (round(monitor.long_blink_count / len(monitor.blink_durations), 4)
-                                             if monitor.blink_durations else None),
-        "duracion_media_parpadeo_s": (round(float(np.mean(monitor.blink_durations)), 4)
-                                      if monitor.blink_durations else None),
+        "proporcion_parpadeos_prolongados": (round(monitor.eyes.long_blink_count / len(monitor.eyes.blink_durations), 4)
+                                             if monitor.eyes.blink_durations else None),
+        "duracion_media_parpadeo_s": (round(float(np.mean(monitor.eyes.blink_durations)), 4)
+                                      if monitor.eyes.blink_durations else None),
         "bostezos": monitor.yawn.count,
         "micro_bostezos": monitor.yawn.micro_count,
         "duracion_media_bostezo_s": (round(float(np.mean(monitor.yawn.durations)), 4)
                                      if monitor.yawn.durations else None),
-        "parpadeos_descartados_giro": monitor.fast_turn_rejected,
+        "parpadeos_descartados_giro": monitor.eyes.fast_turn_rejected,
         "sonrisas_descartadas": monitor.yawn.smile_count,
         "tiempo_postura_fuera_de_rango_s": round(monitor.head.out_time, 2),
         "perclos_final_pct": round(monitor.perclos_val, 2),

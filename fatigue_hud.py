@@ -27,11 +27,11 @@ def draw_hud(img, monitor, perclos_val, has_glasses, is_microsleep, is_yawning):
 
     # Tarjeta 1: Parpadeos y Bostezos
     cv2.putText(img, "PARPADEOS", (30, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
-    cv2.putText(img, f"{monitor.blink_count}", (30, 115), cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 200, 0), 2)
-    cv2.putText(img, f"prolong. {monitor.long_blink_count}", (70, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
-    if monitor.blink_durations:
+    cv2.putText(img, f"{monitor.eyes.blink_count}", (30, 115), cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 200, 0), 2)
+    cv2.putText(img, f"prolong. {monitor.eyes.long_blink_count}", (70, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
+    if monitor.eyes.blink_durations:
         # Duración del último parpadeo: prolongado si dura >= LONG_BLINK_SECONDS con cierre completo
-        cv2.putText(img, f"ultimo {monitor.blink_durations[-1]:.2f} s (prolong. >= {monitor.LONG_BLINK_SECONDS:.1f} s)",
+        cv2.putText(img, f"ultimo {monitor.eyes.blink_durations[-1]:.2f} s (prolong. >= {monitor.LONG_BLINK_SECONDS:.1f} s)",
                     (30, 129), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (120, 120, 130), 1)
 
     cv2.putText(img, "BOSTEZOS", (140, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
