@@ -454,7 +454,7 @@ class FatigueMonitor(Thresholds):
             if self.kss and self._monitoring_started and self.kss.due(self._now):
                 self._ask_kss("inicio" if not self.kss.responses else "periodica")
 
-            img = self.hud.render(img, self, is_microsleep_active, is_yawning_active)
+            img = self.hud.present(self.hud.render(img, self, is_microsleep_active, is_yawning_active))
             cv2.imshow(fatigue_hud.WINDOW_NAME, img)
             key = cv2.waitKey(1) & 0xFF
             if key == ord(' ') and self._is_video_file():

@@ -72,6 +72,21 @@ class FatigueHudTest(unittest.TestCase):
         self.camera = np.full((480, 640, 3), 90, np.uint8)
         self.assertEqual(self.render(FatigueMonitor.FASE_MONITOREO).shape, wide.shape)
 
+    def test_ajuste_a_cualquier_tamano_de_ventana(self):
+        frame = self.render(FatigueMonitor.FASE_MONITOREO)
+        for size in ((1920, 1080), (1366, 700), (800, 600), (1280, 720), (500, 900)):
+            with self.subTest(size=size):
+                out = fatigue_hud.fit_to_window(frame, size)
+                self.assertEqual(out.shape, (size[1], size[0], 3))
+
+    def test_el_ajuste_no_deforma(self):
+        """En una ventana más ancha, la imagen conserva su proporción y deja franjas a los lados."""
+        frame = np.zeros((720, 1280, 3), np.uint8)
+        frame[:] = (200, 50, 50)
+        out = fatigue_hud.fit_to_window(frame, (2000, 720))
+        content_cols = np.where((out == (200, 50, 50)).all(axis=2).any(axis=0))[0]
+        self.assertEqual(content_cols[-1] - content_cols[0] + 1, 1280)
+
     def test_el_nombre_del_nivel_cabe_en_la_tarjeta(self):
         from PIL import Image, ImageDraw
         draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))

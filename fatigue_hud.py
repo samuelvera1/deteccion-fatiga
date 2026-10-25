@@ -41,6 +41,22 @@ def window_size():
     return int(WIDTH * scale), int(HEIGHT * scale)
 
 
+def fit_to_window(frame, size):
+    """Escala frame para que quepa en size=(ancho, alto) conservando la proporción, centrado sobre el fondo."""
+    width, height = size
+    h, w = frame.shape[:2]
+    scale = min(width / w, height / h)
+    if abs(scale - 1.0) < 0.005:
+        return frame
+    nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+    interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
+    out = np.empty((height, width, 3), np.uint8)
+    out[:] = ui.BG[::-1]
+    x, y = (width - nw) // 2, (height - nh) // 2
+    out[y:y + nh, x:x + nw] = cv2.resize(frame, (nw, nh), interpolation=interpolation)
+    return out
+
+
 def _tint(color, amount=0.14):
     """Fondo oscuro con un matiz del color (tarjeta del nivel)."""
     return tuple(int(ui.BG[i] * (1 - amount) + color[i] * amount) for i in range(3))
@@ -85,6 +101,8 @@ class HudRenderer:
         self._overlay_cache = {}
         self._corners = self._corner_patches()
         self._right_strip_key, self._right_strip = None, None
+        self._window = (WIDTH, HEIGHT)          # tamaño actual de la ventana (se consulta cada pocos frames)
+        self._frames = 0
 
     # ------------------------------------------------------------------ piezas fijas
 
@@ -101,6 +119,21 @@ class HudRenderer:
         r = RADIUS + 1
         return [((y, x), self._base[y:y + r, x:x + r].copy())
                 for y, x in ((y0, x0), (y0, x1 - r + 1), (y1 - r + 1, x0), (y1 - r + 1, x1 - r + 1))]
+
+    # ------------------------------------------------------------------ ajuste a la ventana
+
+    def present(self, canvas):
+        """Ajusta el fotograma al tamaño actual de la ventana, sin deformarlo y centrado (franjas del color
+        del fondo). Así se ve bien en cualquier pantalla y al redimensionar la ventana."""
+        if self._frames % 10 == 0:
+            try:
+                _, _, w, h = cv2.getWindowImageRect(WINDOW_NAME)
+            except cv2.error:
+                w = h = 0
+            if w > 0 and h > 0:
+                self._window = (w, h)
+        self._frames += 1
+        return fit_to_window(canvas, self._window)
 
     # ------------------------------------------------------------------ composición
 
