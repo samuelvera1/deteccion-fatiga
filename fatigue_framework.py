@@ -12,6 +12,7 @@ import fatigue_hud
 import fatigue_report
 from fatigue_config import Thresholds
 from fatigue_core import FaceMeshDetector
+from fatigue_pose import HeadPoseTracker
 from fatigue_profile import LandmarkStabilityGate, SubjectProfile
 from session_recorder import FrameRecorder, SessionRecorder
 
@@ -98,16 +99,10 @@ class FatigueMonitor(Thresholds):
         self.micro_yawn_count = 0
         self.smile_count = 0                  # episodios de boca abierta descartados como sonrisa
         self._last_shape = None
-        self.pose_ref = None                  # ejes de la cabeza en la calibración (postura frontal)
-        self._pose_samples = []
-        self._last_axes = None
-        self._last_axes_t = None
-        self.head_speed = None                # velocidad de giro de la cabeza (°/s) en el último frame
-        self.head_pose = None                 # (yaw, pitch, roll) en grados respecto a la calibración
+        self.head = HeadPoseTracker(self.POSE_MAX_PITCH, self.POSE_MAX_YAW, self.POSE_STABLE_MAX,
+                                    self._log_pose_out_of_range)
         self.yawn_durations = []              # duración (s) de la apertura bucal de cada bostezo contado
         self.fast_turn_rejected = 0           # caídas de apertura descartadas por giro rápido de cabeza
-        self._pose_out_since = None           # inicio del intervalo de postura fuera de rango en curso
-        self.pose_out_time = 0.0              # tiempo total (s) de monitoreo con postura fuera de rango
 
         self.fps_estimate = 30                # solo para los parámetros de parpadeo, aún en frames
         # PERCLOS ponderado por tiempo real (independiente de los fps): (t, dt, cerrado) en la ventana.
@@ -144,6 +139,9 @@ class FatigueMonitor(Thresholds):
     def _write_trace(self, now, left_ear, right_ear, ear, mouth):
         if self.session and self.session.save_trace:
             self.session.trace(fatigue_report.trace_row(self, now, left_ear, right_ear, ear, mouth))
+
+    def _log_pose_out_of_range(self, duration):
+        self._log_event("POSTURA_FUERA_DE_RANGO", self.perclos_val, self.has_glasses, 0.0, duration)
 
     def on_blink(self, callback_function):
         self._on_blink = callback_function
@@ -213,8 +211,8 @@ class FatigueMonitor(Thresholds):
         pone o se quita las gafas). full=False conserva la proporción de ojo cerrado medida."""
         self.profile.reset(keep_closed_ratio=not full)
         self._manual_pending = False          # tras recalibrar se usa la calibración automática
-        self._close_pose_interval()
-        self.pose_ref, self._pose_samples, self.head_pose = None, [], None
+        self.head.close_interval(self._now)
+        self.head.reset_reference()
         self._reset_tracking_state()
         self.recalibration_count += 1
         print(f"[CALIBRACION] Recalibrando perfil facial ({reason})")
@@ -247,12 +245,12 @@ class FatigueMonitor(Thresholds):
                   f"neutro y {p.n_closed_samples} del de ojos cerrados (mínimo {calibration_marks.MIN_NEUTRAL_FRAMES}"
                   f" y {calibration_marks.MIN_CLOSED_FRAMES}). Se calibra automáticamente desde aquí.")
             self.profile.reset()
-            self._pose_samples = []
+            self.head.samples = []
             self._log_event("CALIBRACION_MANUAL_FALLIDA", self.perclos_val, self.has_glasses, 0.0)
             return
         p.finish_profile()
         p.finish_manual_closed()
-        self._lock_pose_reference()
+        self.head.lock_reference()
         print(f"[CALIBRACION MANUAL] Ojo abierto={p.open_ear_baseline:.4f} ({p.n_open_samples} frames), "
               f"ojo cerrado={p.closed_ear_level:.4f} ({p.closed_ratio:.0%} del abierto, {p.n_closed_samples} frames), "
               f"boca neutra={p.neutral_mouth_ratio:.4f}")
@@ -276,74 +274,6 @@ class FatigueMonitor(Thresholds):
         if "con" in text and "gafas" in text:
             return True
         return None
-
-    def _pose_within(self, max_pitch, max_yaw):
-        """True si la cabeza está dentro del rango (o si aún no hay orientación disponible)."""
-        if self.head_pose is None:
-            return True
-        yaw, pitch, _ = self.head_pose
-        return abs(pitch) <= max_pitch and abs(yaw) <= max_yaw
-
-    @property
-    def eye_pose_valid(self):
-        return self._pose_within(self.POSE_MAX_PITCH, self.POSE_MAX_YAW)
-
-    @property
-    def pose_frontal(self):
-        return self._pose_within(self.POSE_STABLE_MAX, self.POSE_STABLE_MAX)
-
-    def _track_pose_range(self, now):
-        """Registra cada intervalo de postura fuera de rango como POSTURA_FUERA_DE_RANGO (con su duración)."""
-        valid = self.eye_pose_valid
-        if not valid and self._pose_out_since is None:
-            self._pose_out_since = now
-        elif valid and self._pose_out_since is not None:
-            duration = now - self._pose_out_since
-            self.pose_out_time += duration
-            self._log_event("POSTURA_FUERA_DE_RANGO", self.perclos_val, self.has_glasses, 0.0, duration)
-            self._pose_out_since = None
-        return valid
-
-    def _close_pose_interval(self):
-        """Cierra el intervalo fuera de rango en curso (fin de sesión o recalibración)."""
-        if self._pose_out_since is not None:
-            duration = self._now - self._pose_out_since
-            self.pose_out_time += duration
-            self._log_event("POSTURA_FUERA_DE_RANGO", self.perclos_val, self.has_glasses, 0.0, duration)
-            self._pose_out_since = None
-
-    # ------------------------------------------------------------------ métricas normalizadas
-
-    def _update_head_pose(self, face3d, now):
-        """Orientación de la cabeza (yaw, pitch, roll en grados) RELATIVA a la postura media de la
-        calibración (mirando al frente). Convención R = Ry(yaw)·Rx(pitch)·Rz(roll) en ejes de cámara:
-        yaw = giro a los lados, pitch = arriba/abajo, roll = inclinación hacia el hombro.
-        Además, velocidad de giro (°/s): ángulo de la rotación entre este frame y el anterior / tiempo."""
-        axes = fatigue_geometry.face_axes(face3d)
-        prev, prev_t = self._last_axes, self._last_axes_t
-        self.head_speed = None
-        if axes is not None and prev is not None and prev_t is not None and now > prev_t:
-            cos_angle = np.clip((np.trace(axes @ prev.T) - 1.0) / 2.0, -1.0, 1.0)
-            self.head_speed = float(np.degrees(np.arccos(cos_angle)) / (now - prev_t))
-        self._last_axes, self._last_axes_t = axes, now
-        if axes is None or self.pose_ref is None:
-            self.head_pose = None
-            return
-        r = axes @ self.pose_ref.T
-        yaw = np.degrees(np.arctan2(r[0, 2], r[2, 2]))
-        pitch = np.degrees(np.arcsin(np.clip(-r[1, 2], -1.0, 1.0)))
-        roll = np.degrees(np.arctan2(r[1, 0], r[1, 1]))
-        self.head_pose = (float(yaw), float(pitch), float(roll))
-
-    def _lock_pose_reference(self):
-        """Postura de referencia = ejes medios de los frames de calibración, reortonormalizados (SVD)."""
-        if not self._pose_samples:
-            return
-        try:
-            u, _, vt = np.linalg.svd(np.mean(np.array(self._pose_samples), axis=0))
-            self.pose_ref = u @ vt
-        except np.linalg.LinAlgError:
-            self.pose_ref = None              # sin referencia: la orientación queda vacía en la traza
 
     def _update_ipd(self, face3d):
         """IPD 3D entre los centros de los ojos (punto medio de las comisuras de cada ojo), suavizada."""
@@ -492,7 +422,7 @@ class FatigueMonitor(Thresholds):
                 self.blink_peak_seen, self.blink_split, self.blink_in_burst = False, None, False
                 self.blink_max_head_speed = 0.0
             self.blink_dip = min(self.blink_dip, ear)
-            self.blink_max_head_speed = max(self.blink_max_head_speed, self.head_speed or 0.0)
+            self.blink_max_head_speed = max(self.blink_max_head_speed, self.head.speed or 0.0)
             self.blink_closed_frames += 1
             if self.profile.closed_level_measured:
                 self._split_burst(ear, ref, yawn_blocks_blinks, now)
@@ -601,7 +531,7 @@ class FatigueMonitor(Thresholds):
     def _process_face(self, face, face3d, frame, now):
         """Procesa un rostro detectado. Devuelve (micro-sueño activo, bostezo en curso)."""
         ipd = self._update_ipd(face3d)
-        self._update_head_pose(face3d, now)
+        self.head.update(face3d, now)
         left_ear = fatigue_geometry.eye_opening(face, self.LEFT_EYE, ipd)
         right_ear = fatigue_geometry.eye_opening(face, self.RIGHT_EYE, ipd)
         # Promedio de ambos ojos: con max(), un reflejo en una lente enmascaraba el parpadeo del otro
@@ -611,7 +541,7 @@ class FatigueMonitor(Thresholds):
 
         phase = self.phase
         # Puerta de estabilidad: cabeza quieta y, si ya hay orientación, de frente
-        is_stable = self.stability.update(face, 0.0 if self.pose_frontal else float("inf"))
+        is_stable = self.stability.update(face, 0.0 if self.head.frontal else float("inf"))
 
         if phase == self.FASE_MARCAS:
             # Calibración manual: se acumulan los frames de los tramos marcados por el investigador
@@ -620,8 +550,7 @@ class FatigueMonitor(Thresholds):
             index = self.frames_total - 1
             if n0 <= index <= n1:
                 self.profile.add_sample(ear, mouth, ipd, shape, auto_finish=False)
-                if self._last_axes is not None:
-                    self._pose_samples.append(self._last_axes)
+                self.head.add_calibration_sample()
             elif c0 <= index <= c1:
                 self.profile.add_manual_closed_sample(ear)
             self._write_trace(now, left_ear, right_ear, ear, mouth)
@@ -633,10 +562,9 @@ class FatigueMonitor(Thresholds):
             if not is_stable:
                 self._write_trace(now, left_ear, right_ear, ear, mouth)
                 return False, False
-            if self._last_axes is not None:
-                self._pose_samples.append(self._last_axes)
+            self.head.add_calibration_sample()
             if self.profile.add_sample(ear, mouth, ipd, shape):
-                self._lock_pose_reference()
+                self.head.lock_reference()
                 print(f"[PASO 1] Perfil fijado: apertura ocular={self.profile.open_ear_baseline:.4f}, "
                       f"boca neutra={self.profile.neutral_mouth_ratio:.4f}, IPD 3D={self.profile.ipd_baseline:.1f}px")
                 if self.profile.closed_level_reused:
@@ -704,7 +632,7 @@ class FatigueMonitor(Thresholds):
 
         # Paso 3: monitoreo adaptativo
         is_yawning, yawn_blocks_blinks = self._update_yawn(mouth, now, ear, shape)
-        pose_valid = self._track_pose_range(now)
+        pose_valid = self.head.track_range(now)
         is_microsleep = self._update_eyes(ear, yawn_blocks_blinks, False, now, pose_valid)
         level = self.alert.update(now, self.perclos_val, self.perclos_total_time, is_microsleep)
         if level is not None:
@@ -828,7 +756,7 @@ class FatigueMonitor(Thresholds):
         self._finish_session(native_fps, use_video_clock)
 
     def _finish_session(self, native_fps, use_video_clock):
-        self._close_pose_interval()
+        self.head.close_interval(self._now)
         metadata = self.session.finish(fatigue_report.session_summary(self))
 
         # Duraciones (parpadeo, micro-sueño, PERCLOS) van en segundos; solo el mínimo de frames de un parpadeo

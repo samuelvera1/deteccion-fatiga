@@ -96,8 +96,8 @@ def trace_row(monitor, now, left_ear, right_ear, ear, mouth):
             monitor.blink_count, monitor.yawn_count,
             monitor.micro_yawn_count, fmt(monitor.blink_ref), int(monitor.blink_closed),
             fmt(width_rel), fmt(lift_delta), fmt(jaw_delta), int(monitor._is_smile(shape)),
-            *(fmt(a) for a in (monitor.head_pose or (None, None, None))),
-            int(monitor.eye_pose_valid), monitor.frames_total - 1, fmt(monitor.head_speed)]
+            *(fmt(a) for a in (monitor.head.pose or (None, None, None))),
+            int(monitor.head.eye_valid), monitor.frames_total - 1, fmt(monitor.head.speed)]
 
 
 def session_summary(monitor):
@@ -125,7 +125,7 @@ def session_summary(monitor):
                                      if monitor.yawn_durations else None),
         "parpadeos_descartados_giro": monitor.fast_turn_rejected,
         "sonrisas_descartadas": monitor.smile_count,
-        "tiempo_postura_fuera_de_rango_s": round(monitor.pose_out_time, 2),
+        "tiempo_postura_fuera_de_rango_s": round(monitor.head.out_time, 2),
         "perclos_final_pct": round(monitor.perclos_val, 2),
         "recalibraciones": monitor.recalibration_count,
         "ojo_abierto_ref": monitor.profile.open_ear_baseline,

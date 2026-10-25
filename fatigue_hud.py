@@ -105,7 +105,7 @@ def draw_hud(img, monitor, perclos_val, has_glasses, is_microsleep, is_yawning):
                         (0, 140, 255) if i == 0 else (200, 200, 210), 1)
 
     cv2.putText(img, "[C] recalibrar  [Q] salir", (30, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
-    if monitor.phase == monitor.FASE_MONITOREO and not monitor.eye_pose_valid:
+    if monitor.phase == monitor.FASE_MONITOREO and not monitor.head.eye_valid:
         cv2.putText(img, "POSTURA FUERA DE RANGO", (30, h - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 140, 255), 1)
     fps = monitor.session.current_fps if monitor.session else None
     if fps:
