@@ -29,6 +29,8 @@ import os
 import sys
 import traceback
 
+import cv2
+
 import calibration_marks
 import version
 from fatigue_framework import FatigueMonitor
@@ -48,6 +50,8 @@ def registrar_bostezo(total_bostezos):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Monitor de fatiga en tiempo real")
     parser.add_argument("--version", action="version", version=f"Fatiga Detector {version.VERSION}")
+    parser.add_argument("--ventanas", action="store_true",
+                        help="abre las ventanas de inicio y de resumen en lugar de usar la consola")
     who = parser.add_mutually_exclusive_group()
     who.add_argument("--nombre", help='nombre del participante entre comillas (ej. "Samuel Vera"); la sesión se '
                                       'guarda con el nombre y con un código anónimo (S01...) aparte')
@@ -102,8 +106,8 @@ def manual_marks_for(source, ignore):
     return marks
 
 
-def main(argv=None):
-    args = parse_args(argv)
+def run_session(args):
+    """Una sesión completa (registro del participante, calibración y monitor). Devuelve el monitor ya terminado."""
     subject_code = None
     if args.nombre:
         subject_code, is_new = ParticipantRegistry().code_for(args.nombre)
@@ -120,8 +124,11 @@ def main(argv=None):
     monitor.on_blink(registrar_parpadeo)
     monitor.on_yawn(registrar_bostezo)
     monitor.start()
+    return monitor
 
-    # ── RESUMEN DE LA SESIÓN ────────────────────────────────────────
+
+def print_summary(monitor):
+    """Resumen de la sesión en la consola."""
     meta = monitor.session.metadata
     resumen, rendimiento = meta["resumen"], meta["rendimiento"]
     print("\n" + "=" * 50)
@@ -167,39 +174,71 @@ def main(argv=None):
               f'  python revisar.py "{monitor.session.dir}" --ciego')
 
 
-def ask_session_options():
-    """Ejecutable abierto con doble clic (sin argumentos): pregunta lo mínimo para empezar la sesión."""
-    print(f"FATIGA DETECTOR {version.VERSION}\n")
-    name = input("Nombre del participante (Enter = anónimo): ").strip()
-    glasses = input("¿Lleva gafas? [s = con gafas / n = sin gafas / Enter = no indicar]: ").strip().lower()
-    record = input("¿Grabar el vídeo para anotarlo después? [s / N]: ").strip().lower() == "s"
+def options_to_argv(choice):
+    """Opciones de la ventana de inicio -> argumentos de línea de comandos (así hay un solo camino de arranque)."""
     argv = []
-    if name:
-        argv += ["--nombre", name]
-    if glasses in ("s", "n"):
-        argv += ["--condicion", "con_gafas" if glasses == "s" else "sin_gafas"]
-    if record:
+    if choice["name"]:
+        argv += ["--nombre", choice["name"]]
+    if choice["condition"]:
+        argv += ["--condicion", choice["condition"]]
+    if choice["record"]:
         argv.append("--grabar")
     return argv
 
 
+def camera_available(index=0):
+    """Comprueba que la cámara abre y entrega un frame (antes de empezar la sesión)."""
+    capture = cv2.VideoCapture(index)
+    try:
+        return bool(capture.isOpened() and capture.read()[0])
+    finally:
+        capture.release()
+
+
+def run_with_windows():
+    """Modo con ventanas: inicio -> sesión -> resumen, y de ahí a una sesión nueva o a salir."""
+    import gui
+    import session_view
+    while True:
+        choice = gui.ask_start()
+        if choice is None:
+            return
+        while not camera_available():
+            if gui.camera_error() != "retry":
+                return
+        monitor = run_session(parse_args(options_to_argv(choice)))
+        print_summary(monitor)
+        view = session_view.summary_view(monitor.session.metadata, monitor.closure_reliable, monitor.session.dir)
+        if gui.show_summary(view) != "new":
+            return
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    if args.ventanas:
+        run_with_windows()
+        return
+    print_summary(run_session(args))
+
+
 def run_executable():
     """Ejecutable (PyInstaller): trabaja junto al .exe, así sesiones/ y participantes_privado.csv quedan en la
-    misma carpeta aunque se abra con doble clic. Con doble clic, deja la consola abierta al terminar para que
-    se pueda leer el resumen o el error."""
+    misma carpeta aunque se abra con doble clic. Sin argumentos (doble clic) abre las ventanas; con argumentos
+    se comporta como main.py en la consola."""
     os.chdir(os.path.dirname(sys.executable))
-    double_click = len(sys.argv) == 1
+    windows = len(sys.argv) == 1
     try:
-        main(ask_session_options() if double_click else None)
+        main(["--ventanas"] if windows else None)
     except SystemExit as stop:
         if isinstance(stop.code, str):
             print(stop.code)
-        elif stop.code not in (0, None) and not double_click:
+        elif stop.code not in (0, None) and not windows:
             raise
-    except Exception:
+    except Exception as error:
         traceback.print_exc()
-    if double_click:
-        input("\nPulsa Enter para cerrar...")
+        if windows:
+            import gui
+            gui.show_error(f"Algo falló y el programa tuvo que cerrarse.\n\n{error}")
 
 
 if __name__ == "__main__":

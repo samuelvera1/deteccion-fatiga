@@ -8,7 +8,8 @@ REQUISITOS
 
 CÓMO USARLO
   1. Descomprime la carpeta completa (no muevas FatigaDetector.exe fuera de ella).
-  2. Haz doble clic en FatigaDetector.exe. Te pregunta el nombre, si llevas gafas y si quieres grabar.
+  2. Haz doble clic en FatigaDetector.exe. Se abre una ventana de inicio: escribe tu nombre (es opcional), elige
+     si llevas gafas, decide si quieres grabar el vídeo y pulsa "Empezar".
   3. Calibración (los primeros segundos, con la guía en pantalla):
        Paso 1: mira al frente, con los ojos abiertos y sin moverte.
        Paso 2: cierra los ojos hasta oír el pitido, y ábrelos.
@@ -16,7 +17,8 @@ CÓMO USARLO
      contadores de parpadeos y bostezos.
   5. Teclas:  C = recalibrar (cierra los ojos hasta oír el pitido)    Q = terminar la sesión
               Espacio = pausa (solo al analizar un vídeo)
-  Al terminar muestra un resumen en la consola.
+  Al terminar se abre una ventana con el resumen de la sesión (parpadeos, bostezos, PERCLOS y tiempo en cada nivel),
+  con un botón para abrir la carpeta donde se guardó y otro para empezar una sesión nueva.
 
 DÓNDE QUEDAN LOS DATOS
   En la carpeta "sesiones" junto al .exe: una carpeta por sesión con
@@ -30,7 +32,9 @@ USO AVANZADO (desde una consola, en la carpeta del programa)
   FatigaDetector.exe --help
 
 NOTAS
-  - El primer arranque tarda unos segundos en abrir.
+  - El primer arranque tarda unos segundos en abrir. Junto a las ventanas se abre una consola negra: no la
+    cierres mientras usas el programa.
+  - Si no encuentra la cámara, te lo dice y puedes reintentar (revisa que ningún otro programa la esté usando).
   - Algunos antivirus desconfían de los programas empaquetados que no están firmados. Si lo bloquea, permite
     la carpeta o pide al autor el código fuente.
   - Los umbrales de las alertas vienen de la literatura y son provisionales: es una herramienta de

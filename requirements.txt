@@ -3,3 +3,4 @@ opencv-python==4.9.0.80
 numpy==1.26.4
 psutil==7.2.2
 pillow==12.3.0
+customtkinter==6.0.0
