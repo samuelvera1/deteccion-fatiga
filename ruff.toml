@@ -1,0 +1,6 @@
+# Estilo del proyecto: errores reales (F) y de sintaxis (E9); líneas de hasta 130 caracteres
+line-length = 130
+extend-exclude = ["venv", "sesiones", "cache_revisor"]
+
+[lint]
+select = ["F", "E9"]

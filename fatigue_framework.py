@@ -1,22 +1,24 @@
 # fatigue_framework.py
+"""Monitor de fatiga: orquesta la captura, la calibración y los detectores (ojos, bostezos, postura)."""
+import time
+
 import cv2
 import numpy as np
-import time
-from collections import deque
+
 import calibration_marks
-from kss import KSSPrompter
-from fatigue_alert import FatigueAlert, MESSAGES, COLORS_BGR, NORMAL
 import fatigue_audio
 import fatigue_geometry
 import fatigue_hud
 import fatigue_report
+from fatigue_alert import FatigueAlert, MESSAGES, NORMAL
 from fatigue_config import Thresholds
 from fatigue_core import FaceMeshDetector
 from fatigue_eyes import EyeEventDetector
 from fatigue_perclos import PerclosWindow
 from fatigue_pose import HeadPoseTracker
-from fatigue_yawn import YawnDetector
 from fatigue_profile import LandmarkStabilityGate, SubjectProfile
+from fatigue_yawn import YawnDetector
+from kss import KSSPrompter
 from session_recorder import FrameRecorder, SessionRecorder
 
 
