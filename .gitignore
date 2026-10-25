@@ -29,3 +29,8 @@ cache_revisor/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Compilación del ejecutable (build.py)
+build/
+dist/
+build_info.json

@@ -27,8 +27,10 @@ import argparse
 import datetime
 import os
 import sys
+import traceback
 
 import calibration_marks
+import version
 from fatigue_framework import FatigueMonitor
 from session_recorder import ParticipantRegistry
 
@@ -43,8 +45,9 @@ def registrar_bostezo(total_bostezos):
     print(f"[{hora_actual}] ¡ALERTA! Bostezo detectado. Total: {total_bostezos}")
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Monitor de fatiga en tiempo real")
+    parser.add_argument("--version", action="version", version=f"Fatiga Detector {version.VERSION}")
     who = parser.add_mutually_exclusive_group()
     who.add_argument("--nombre", help='nombre del participante entre comillas (ej. "Samuel Vera"); la sesión se '
                                       'guarda con el nombre y con un código anónimo (S01...) aparte')
@@ -67,7 +70,7 @@ def parse_args():
                         help="desactiva refine_landmarks de MediaPipe (solo para comparar con el modo anterior)")
     parser.add_argument("--calibracion-auto", action="store_true",
                         help="ignora las marcas de calibración manual del vídeo y calibra automáticamente")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     args.fuente = int(args.fuente) if args.fuente.isdigit() else args.fuente
     if args.resolucion.lower() == "nativa":
         args.resolucion = None
@@ -99,8 +102,8 @@ def manual_marks_for(source, ignore):
     return marks
 
 
-if __name__ == "__main__":
-    args = parse_args()
+def main(argv=None):
+    args = parse_args(argv)
     subject_code = None
     if args.nombre:
         subject_code, is_new = ParticipantRegistry().code_for(args.nombre)
@@ -155,9 +158,52 @@ if __name__ == "__main__":
     print(f"FPS de procesamiento: {rendimiento['fps_procesamiento_medio']}")
     print(f"CPU del proceso:      {rendimiento['cpu_proceso_pct_medio']}%")
     print(f"RAM del proceso:      {rendimiento['ram_proceso_mb_media']} MB")
+    print(f"Versión:              {version.VERSION} ({'ejecutable' if version.is_frozen() else 'código fuente'})")
     print(f"Commit:               {meta['git']['commit']}")
     print("=" * 50)
     print(f"\nDatos guardados en '{monitor.session.dir}'.")
     if meta.get("grabacion"):
         print(f"Grabación: {meta['grabacion']['frames']} frames. Para anotarla:\n"
               f'  python revisar.py "{monitor.session.dir}" --ciego')
+
+
+def ask_session_options():
+    """Ejecutable abierto con doble clic (sin argumentos): pregunta lo mínimo para empezar la sesión."""
+    print(f"FATIGA DETECTOR {version.VERSION}\n")
+    name = input("Nombre del participante (Enter = anónimo): ").strip()
+    glasses = input("¿Lleva gafas? [s = con gafas / n = sin gafas / Enter = no indicar]: ").strip().lower()
+    record = input("¿Grabar el vídeo para anotarlo después? [s / N]: ").strip().lower() == "s"
+    argv = []
+    if name:
+        argv += ["--nombre", name]
+    if glasses in ("s", "n"):
+        argv += ["--condicion", "con_gafas" if glasses == "s" else "sin_gafas"]
+    if record:
+        argv.append("--grabar")
+    return argv
+
+
+def run_executable():
+    """Ejecutable (PyInstaller): trabaja junto al .exe, así sesiones/ y participantes_privado.csv quedan en la
+    misma carpeta aunque se abra con doble clic. Con doble clic, deja la consola abierta al terminar para que
+    se pueda leer el resumen o el error."""
+    os.chdir(os.path.dirname(sys.executable))
+    double_click = len(sys.argv) == 1
+    try:
+        main(ask_session_options() if double_click else None)
+    except SystemExit as stop:
+        if isinstance(stop.code, str):
+            print(stop.code)
+        elif stop.code not in (0, None) and not double_click:
+            raise
+    except Exception:
+        traceback.print_exc()
+    if double_click:
+        input("\nPulsa Enter para cerrar...")
+
+
+if __name__ == "__main__":
+    if version.is_frozen():
+        run_executable()
+    else:
+        main()

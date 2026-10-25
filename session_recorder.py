@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 import psutil
 
+import version
+
 
 class FrameRecorder:
     """
@@ -162,6 +164,8 @@ class SessionRecorder:
             "codigo_anonimo": self.subject_code,
             "condicion": self.condition,
             "inicio": self.started.isoformat(timespec="seconds"),
+            "software": {"version": version.VERSION, "ejecutable": version.is_frozen(),
+                         "compilado": (version.build_info() or {}).get("fecha")},
             "git": self._git_info(),
             "versiones": {"python": sys.version.split()[0], "opencv": cv2.__version__,
                           "mediapipe": self._module_version("mediapipe"), "numpy": np.__version__},
@@ -184,6 +188,9 @@ class SessionRecorder:
     @staticmethod
     def _git_info():
         """Commit del código y archivos versionados con cambios sin commit (sesión no reproducible)."""
+        info = version.build_info()
+        if info is not None:          # ejecutable: no hay git, el commit se fijó al compilar
+            return {"commit": info.get("commit"), "cambios_sin_commit": info.get("cambios_sin_commit")}
         here = os.path.dirname(os.path.abspath(__file__))
 
         def git(*args):
