@@ -100,6 +100,7 @@ class FatigueMonitor(Thresholds):
         # PERCLOS ponderado por tiempo real (independiente de los fps): (t, dt, cerrado) en la ventana.
         # Denominador mínimo perclos_min_seconds: al inicio un solo parpadeo no puede inflar el PERCLOS.
         self.perclos = PerclosWindow(window_seconds, perclos_min_seconds)
+        self.hud = fatigue_hud.HudRenderer()
         self.eyes = EyeEventDetector(self.profile, self.perclos, self.head, self._log_detector_event)
 
         self.ipd = None
@@ -423,6 +424,9 @@ class FatigueMonitor(Thresholds):
             self.recorder = FrameRecorder(self.session.dir, frame_size, native_fps)
             print(f"[GRABACION] Se guarda lo que ve la cámara en {self.session.dir} (para anotarlo después)")
 
+        cv2.namedWindow(fatigue_hud.WINDOW_NAME, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(fatigue_hud.WINDOW_NAME, *fatigue_hud.window_size())
+
         while True:
             success, img = cap.read()
             if not success:
@@ -450,19 +454,15 @@ class FatigueMonitor(Thresholds):
             if self.kss and self._monitoring_started and self.kss.due(self._now):
                 self._ask_kss("inicio" if not self.kss.responses else "periodica")
 
-            fatigue_hud.draw_hud(img, self, self.perclos_val, self.has_glasses, is_microsleep_active, is_yawning_active)
-            fatigue_hud.draw_phase_overlay(img, self)
-
-            if self.kss and self.kss.prompt:
-                self.kss.draw(img)
-            cv2.imshow("Fatigue Framework Monitor", img)
+            img = self.hud.render(img, self, is_microsleep_active, is_yawning_active)
+            cv2.imshow(fatigue_hud.WINDOW_NAME, img)
             key = cv2.waitKey(1) & 0xFF
             if key == ord(' ') and self._is_video_file():
                 # Pausa (solo vídeos: el reloj es el del archivo, así que pausar no altera las mediciones)
                 key = 0
                 while key not in (ord(' '), ord('q')):
                     key = cv2.waitKey(50) & 0xFF
-                    if cv2.getWindowProperty("Fatigue Framework Monitor", cv2.WND_PROP_VISIBLE) < 1:
+                    if cv2.getWindowProperty(fatigue_hud.WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
                         key = ord('q')       # ventana cerrada durante la pausa
                 self.session.reset_tick()    # el tiempo en pausa no cuenta en los FPS de procesamiento
             if self.kss and self.kss.prompt and ord('1') <= key <= ord('9'):

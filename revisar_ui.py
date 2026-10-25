@@ -69,6 +69,18 @@ def _font_file(bold):
     return None
 
 
+_FONT_CACHE = {}
+
+
+def load_font(size, bold=False):
+    """Fuente TrueType del tamaño pedido (la misma que usa la interfaz), cacheada."""
+    key = (size, bold)
+    if key not in _FONT_CACHE:
+        path = _font_file(bold)
+        _FONT_CACHE[key] = ImageFont.truetype(path, size) if path else ImageFont.load_default(size=size)
+    return _FONT_CACHE[key]
+
+
 class Fonts:
     def __init__(self):
         regular, bold = _font_file(False), _font_file(True)

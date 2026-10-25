@@ -30,6 +30,8 @@ VIDEOS = [
 
 
 def _headless():
+    cv2.namedWindow = lambda *a, **k: None
+    cv2.resizeWindow = lambda *a, **k: None
     cv2.imshow = lambda *a, **k: None
     cv2.waitKey = lambda *a, **k: 255
     cv2.destroyAllWindows = lambda *a, **k: None
