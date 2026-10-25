@@ -41,20 +41,24 @@ def window_size():
     return int(WIDTH * scale), int(HEIGHT * scale)
 
 
-def fit_to_window(frame, size):
-    """Escala frame para que quepa en size=(ancho, alto) conservando la proporción, centrado sobre el fondo."""
+def fit_to_window(frame, size, buffer=None):
+    """Escala frame para que quepa en size=(ancho, alto) conservando la proporción, centrado sobre el fondo.
+    buffer: lienzo del tamaño de la ventana de una llamada anterior; se reutiliza (las franjas del fondo no
+    cambian) en lugar de reservar y rellenar uno nuevo en cada frame. Devuelve la imagen a mostrar."""
     width, height = size
     h, w = frame.shape[:2]
     scale = min(width / w, height / h)
     if abs(scale - 1.0) < 0.005:
         return frame
     nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
-    interpolation = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
-    out = np.empty((height, width, 3), np.uint8)
-    out[:] = ui.BG[::-1]
+    if buffer is None or buffer.shape != (height, width, 3):
+        buffer = np.empty((height, width, 3), np.uint8)
+        buffer[:] = ui.BG[::-1]
     x, y = (width - nw) // 2, (height - nh) // 2
-    out[y:y + nh, x:x + nw] = cv2.resize(frame, (nw, nh), interpolation=interpolation)
-    return out
+    # INTER_AREA solo compensa al reducir mucho; en el resto LINEAL es más rápido y no se nota
+    interpolation = cv2.INTER_AREA if scale < 0.75 else cv2.INTER_LINEAR
+    cv2.resize(frame, (nw, nh), dst=buffer[y:y + nh, x:x + nw], interpolation=interpolation)
+    return buffer
 
 
 def _tint(color, amount=0.14):
@@ -103,6 +107,7 @@ class HudRenderer:
         self._right_strip_key, self._right_strip = None, None
         self._window = (WIDTH, HEIGHT)          # tamaño actual de la ventana (se consulta cada pocos frames)
         self._frames = 0
+        self._fit_buffer = None
 
     # ------------------------------------------------------------------ piezas fijas
 
@@ -133,7 +138,10 @@ class HudRenderer:
             if w > 0 and h > 0:
                 self._window = (w, h)
         self._frames += 1
-        return fit_to_window(canvas, self._window)
+        out = fit_to_window(canvas, self._window, self._fit_buffer)
+        if out is not canvas:
+            self._fit_buffer = out
+        return out
 
     # ------------------------------------------------------------------ composición
 
@@ -179,7 +187,7 @@ class HudRenderer:
         if info:
             title, subtitle, progress = info
             overlay = self._calibration_banner(title, subtitle, progress, box.shape[1] - 48)
-            self._blend(box, overlay, box.shape[0] - overlay.shape[0] - 24)
+            self._blend(box, overlay, box.shape[0] - overlay[0].shape[0] - 24)
 
     def _cached(self, key, build):
         if key not in self._overlay_cache:
@@ -195,9 +203,9 @@ class HudRenderer:
             w, h = int(probe.textlength(text, font=font)) + 56, 52
             img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
             d = ImageDraw.Draw(img)
-            d.rounded_rectangle((0, 0, w - 1, h - 1), radius=12, fill=fill + (242,))
+            d.rounded_rectangle((0, 0, w - 1, h - 1), radius=12, fill=fill + (255,))
             d.text((w / 2, h / 2), text, font=font, fill=ink, anchor="mm")
-            return np.asarray(img)
+            return self._sprite(img)
         return self._cached(("banner", text, fill, ink), build)
 
     def _calibration_banner(self, title, subtitle, progress, width):
@@ -206,24 +214,29 @@ class HudRenderer:
         def build():
             img = Image.new("RGBA", (width, 92), (0, 0, 0, 0))
             d = ImageDraw.Draw(img)
-            d.rounded_rectangle((0, 0, width - 1, 91), radius=12, fill=ui.BG + (236,), outline=CALIBRATING_COLOR + (255,))
+            d.rounded_rectangle((0, 0, width - 1, 91), radius=12, fill=ui.BG + (255,), outline=CALIBRATING_COLOR + (255,))
             d.text((width / 2, 24), title, font=ui.load_font(20, True), fill=ui.TEXT, anchor="mm")
             d.text((width / 2, 50), subtitle, font=ui.load_font(15), fill=ui.MUTED, anchor="mm")
             d.rounded_rectangle((20, 70, width - 20, 78), radius=4, fill=ui.TRACK + (255,))
             filled = int((width - 40) * step / 100)
             if filled > 0:
                 d.rounded_rectangle((20, 70, 20 + max(filled, 8), 78), radius=4, fill=CALIBRATING_COLOR + (255,))
-            return np.asarray(img)
+            return self._sprite(img)
         return self._cached(("calibration", title, subtitle, step, width), build)
 
     @staticmethod
-    def _blend(box, rgba, top):
-        """Pega una imagen RGBA sobre box (BGR), centrada en x y con su borde superior en `top`. Devuelve su alto."""
-        h, w = rgba.shape[:2]
+    def _sprite(rgba_img):
+        """(imagen BGR, máscara) de una imagen RGBA; con la máscara se pega con cv2.copyTo, sin cálculos por píxel."""
+        rgba = np.asarray(rgba_img)
+        return np.ascontiguousarray(rgba[:, :, 2::-1]), np.ascontiguousarray((rgba[:, :, 3] > 0).astype(np.uint8) * 255)
+
+    @staticmethod
+    def _blend(box, sprite, top):
+        """Pega un sprite sobre box (BGR), centrado en x y con su borde superior en `top`. Devuelve su alto."""
+        bgr, mask = sprite
+        h, w = bgr.shape[:2]
         x = (box.shape[1] - w) // 2
-        region = box[top:top + h, x:x + w]
-        alpha = rgba[:, :, 3:4].astype(np.float32) / 255.0
-        region[:] = (region * (1 - alpha) + rgba[:, :, 2::-1] * alpha).astype(np.uint8)
+        cv2.copyTo(bgr, mask, box[top:top + h, x:x + w])
         return h
 
     # ------------------------------------------------------------------ panel
