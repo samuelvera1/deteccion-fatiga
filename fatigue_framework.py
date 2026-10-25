@@ -6,6 +6,8 @@ from collections import deque
 import calibration_marks
 from kss import KSSPrompter
 from fatigue_alert import FatigueAlert, MESSAGES, COLORS_BGR, NORMAL
+import fatigue_audio
+import fatigue_geometry
 import fatigue_hud
 from fatigue_config import Thresholds
 from fatigue_core import FaceMeshDetector
@@ -359,25 +361,6 @@ class FatigueMonitor(Thresholds):
             return True
         return None
 
-    @staticmethod
-    def _retry_beep():
-        """Dos tonos graves, distintos del pitido agudo de 'abre los ojos': el intento no salió, mira la pantalla."""
-        try:
-            import winsound
-            winsound.Beep(500, 180)
-            winsound.Beep(400, 260)
-        except Exception:
-            print("\a\a", end="", flush=True)
-
-    @staticmethod
-    def _beep():
-        """Aviso sonoro (el sujeto tiene los ojos cerrados y no ve la pantalla)."""
-        try:
-            import winsound
-            winsound.Beep(1200, 250)
-        except Exception:
-            print("\a", end="", flush=True)
-
     def _pose_within(self, max_pitch, max_yaw):
         """True si la cabeza está dentro del rango (o si aún no hay orientación disponible)."""
         if self.head_pose is None:
@@ -415,30 +398,12 @@ class FatigueMonitor(Thresholds):
 
     # ------------------------------------------------------------------ métricas normalizadas
 
-    @staticmethod
-    def _face_axes(face3d):
-        """Ejes de la cabeza (columnas: derecha, abajo, adelante) a partir de landmarks 3D: línea entre los
-        centros de los ojos y eje frente (10) -> mentón (152), ortonormalizados. Coordenadas de MediaPipe:
-        x a la derecha, y hacia abajo, z alejándose de la cámara (z estimada por la red, no medida)."""
-        p = np.asarray(face3d, dtype=np.float64)
-        across = (p[362] + p[263]) / 2.0 - (p[33] + p[133]) / 2.0
-        down = p[152] - p[10]
-        if np.linalg.norm(across) < 1e-6:
-            return None
-        x = across / np.linalg.norm(across)
-        y = down - np.dot(down, x) * x
-        if np.linalg.norm(y) < 1e-6:
-            return None                       # malla degenerada: frente y mentón alineados con los ojos
-        y /= np.linalg.norm(y)
-        axes = np.column_stack([x, y, np.cross(x, y)])
-        return axes if np.all(np.isfinite(axes)) else None
-
     def _update_head_pose(self, face3d, now):
         """Orientación de la cabeza (yaw, pitch, roll en grados) RELATIVA a la postura media de la
         calibración (mirando al frente). Convención R = Ry(yaw)·Rx(pitch)·Rz(roll) en ejes de cámara:
         yaw = giro a los lados, pitch = arriba/abajo, roll = inclinación hacia el hombro.
         Además, velocidad de giro (°/s): ángulo de la rotación entre este frame y el anterior / tiempo."""
-        axes = self._face_axes(face3d)
+        axes = fatigue_geometry.face_axes(face3d)
         prev, prev_t = self._last_axes, self._last_axes_t
         self.head_speed = None
         if axes is not None and prev is not None and prev_t is not None and now > prev_t:
@@ -471,36 +436,6 @@ class FatigueMonitor(Thresholds):
         raw_ipd = float(np.linalg.norm(left_center - right_center))
         self.ipd = raw_ipd if self.ipd is None else self.ipd + self.IPD_SMOOTHING * (raw_ipd - self.ipd)
         return self.ipd
-
-    def _eye_opening(self, face, eye_indices, ipd):
-        """EAR normalizado por IPD: apertura vertical media del ojo / IPD."""
-        _, p2, p3, _, p5, p6 = [face[idx] for idx in eye_indices]
-        vertical = (self.detector.findDistance(p2, p6) + self.detector.findDistance(p3, p5)) / 2.0
-        return vertical / ipd if ipd > 0 else 0.0
-
-    def _mouth_opening(self, face, ipd):
-        """Apertura interna de los labios / IPD (el ancho de la boca cambia al bostezar; la IPD no)."""
-        return self.detector.findDistance(face[13], face[14]) / ipd if ipd > 0 else 0.0
-
-    def _mouth_shape(self, face, ipd):
-        """(ancho de boca, distancia nariz-mentón, elevación de comisuras) en unidades de IPD.
-        La elevación se mide sobre el eje vertical de la cara (perpendicular a la línea de los ojos, hacia
-        el mentón): positiva si las comisuras (61, 291) quedan por encima del labio superior interno (13)."""
-        if ipd <= 0:
-            return None
-        pts = np.asarray(face, dtype=np.float64)
-        across = (pts[362] + pts[263]) / 2.0 - (pts[33] + pts[133]) / 2.0
-        norm = float(np.linalg.norm(across))
-        if norm == 0:
-            return None
-        down = np.array([-across[1], across[0]]) / norm
-        if np.dot(pts[152] - pts[1], down) < 0:          # vídeo espejado: el eje debe apuntar al mentón
-            down = -down
-        corners = (pts[61] + pts[291]) / 2.0
-        width = float(np.linalg.norm(pts[61] - pts[291])) / ipd
-        jaw = float(np.linalg.norm(pts[152] - pts[1])) / ipd
-        lift = float(np.dot(pts[13] - corners, down)) / ipd
-        return width, jaw, lift
 
     def _is_smile(self, shape):
         """Sonrisa (FACS, AU12 'lip corner puller'): boca claramente más ancha que en reposo sin la caída de
@@ -751,12 +686,12 @@ class FatigueMonitor(Thresholds):
         """Procesa un rostro detectado. Devuelve (micro-sueño activo, bostezo en curso)."""
         ipd = self._update_ipd(face3d)
         self._update_head_pose(face3d, now)
-        left_ear = self._eye_opening(face, self.LEFT_EYE, ipd)
-        right_ear = self._eye_opening(face, self.RIGHT_EYE, ipd)
+        left_ear = fatigue_geometry.eye_opening(face, self.LEFT_EYE, ipd)
+        right_ear = fatigue_geometry.eye_opening(face, self.RIGHT_EYE, ipd)
         # Promedio de ambos ojos: con max(), un reflejo en una lente enmascaraba el parpadeo del otro
         ear = (left_ear + right_ear) / 2.0
-        mouth = self._mouth_opening(face, ipd)
-        self._last_shape = shape = self._mouth_shape(face, ipd)
+        mouth = fatigue_geometry.mouth_opening(face, ipd)
+        self._last_shape = shape = fatigue_geometry.mouth_shape(face, ipd)
 
         phase = self.phase
         # Puerta de estabilidad: cabeza quieta y, si ya hay orientación, de frente
@@ -817,7 +752,7 @@ class FatigueMonitor(Thresholds):
                 self._closed_attempt += 1
                 self.profile.restart_closed_phase()
                 self._closed_retry_until = now + self.CLOSED_RETRY_PAUSE
-                self._retry_beep()
+                fatigue_audio.retry_beep()
                 print(f"[PASO 2] No se detectaron los ojos cerrados: intento {self._closed_attempt} de "
                       f"{self.CLOSED_MAX_ATTEMPTS} en {self.CLOSED_RETRY_PAUSE:.0f} s")
                 self._log_event("CALIBRACION_CIERRE_REINTENTO", self.perclos_val, self.has_glasses, 0.0,
@@ -832,7 +767,7 @@ class FatigueMonitor(Thresholds):
                           f"el nivel de reserva ({self.CLOSED_FALLBACK_RATIO} x ojo abierto), NO medido. "
                           f"Pulsa C para repetir la calibración.")
             if done:
-                self._beep()
+                fatigue_audio.beep()
                 measured = "medido" if self.profile.closed_level_measured else "RESERVA (no medido)"
                 print(f"[PASO 2] Ojo cerrado: {self.profile.closed_ear_level:.4f} "
                       f"({self.profile.closed_ear_level / self.profile.open_ear_baseline:.0%} del ojo abierto, {measured})")
