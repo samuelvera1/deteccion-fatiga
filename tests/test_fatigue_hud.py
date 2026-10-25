@@ -87,6 +87,14 @@ class FatigueHudTest(unittest.TestCase):
         content_cols = np.where((out == (200, 50, 50)).all(axis=2).any(axis=0))[0]
         self.assertEqual(content_cols[-1] - content_cols[0] + 1, 1280)
 
+    def test_normal_sin_datos_suficientes_no_dice_por_debajo(self):
+        """Con la ventana de PERCLOS incompleta el nivel es NORMAL por falta de datos, no por PERCLOS bajo."""
+        self.monitor.perclos.total_time = 20.0
+        incomplete = self.render(FatigueMonitor.FASE_MONITOREO)
+        self.monitor.perclos.total_time = 60.0
+        complete = self.render(FatigueMonitor.FASE_MONITOREO)
+        self.assertFalse(np.array_equal(incomplete, complete))
+
     def test_el_nombre_del_nivel_cabe_en_la_tarjeta(self):
         from PIL import Image, ImageDraw
         draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))

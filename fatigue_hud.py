@@ -248,7 +248,7 @@ class HudRenderer:
             self._panel = np.empty((PANEL_HEIGHT, PANEL_X1 - PANEL_X0, 3), np.uint8)
             self._panel[:] = ui.BG[::-1]
             self._panel_img = Image.new("RGB", (PANEL_X1 - PANEL_X0, PANEL_HEIGHT), ui.BG)
-        keys = {"level": state[1:4] + state[12:14], "perclos": (state[0], state[3]) + state[4:6] + state[12:15],
+        keys = {"level": state[1:4] + state[12:14] + state[16:18], "perclos": (state[0], state[3]) + state[4:6] + state[12:15],
                 "counters": state[6:8] + state[9:11], "info": (state[8], state[11])}
         changed = [part for part, key in keys.items() if self._panel_key.get(part) != key]
         if changed:
@@ -262,6 +262,8 @@ class HudRenderer:
         phase = monitor.phase
         calibrating = phase in PHASES_CALIBRATING
         info = phase_info(monitor) if calibrating else None
+        # segundos de datos válidos que exige la alerta de PERCLOS (fatigue_alert.MIN_VALID_FRACTION)
+        need = monitor.alert.MIN_VALID_FRACTION * monitor.alert.window_seconds
         reliable = monitor.closure_reliable
         durations = monitor.eyes.blink_durations
         glasses = monitor.has_glasses
@@ -273,11 +275,11 @@ class HudRenderer:
                 monitor.yawn.count, monitor.yawn.micro_count,
                 None if glasses is None else bool(glasses),
                 monitor.PERCLOS_WARN_PCT, monitor.PERCLOS_ALERT_PCT, monitor.PERCLOS_BAR_MAX,
-                monitor.LONG_BLINK_SECONDS)
+                monitor.LONG_BLINK_SECONDS, int(min(monitor.perclos.total_time, need)), int(need))
 
     def _draw_panel(self, state, parts):
         (calibrating, calib, level, unreliable, perclos, gathering, blinks, long_blinks, last_blink,
-         yawns, micro_yawns, glasses, warn, alert, bar_max, long_seconds) = state
+         yawns, micro_yawns, glasses, warn, alert, bar_max, long_seconds, valid_secs, need_secs) = state
         width = PANEL_X1 - PANEL_X0
         img = self._panel_img
         d = ImageDraw.Draw(img)
@@ -301,6 +303,9 @@ class HudRenderer:
                             SOMNOLENCIA: f"PERCLOS ≥ {alert:.0f} %", MICRO_SUENO: "Ojos cerrados ≥ 1 s"}[level]
                 if unreliable:
                     subtitle = "PERCLOS no fiable (ojo cerrado no medido)"
+                elif level == NORMAL and valid_secs < need_secs:
+                    # la alerta de PERCLOS espera la ventana casi completa: con menos datos no se puede decir "por debajo"
+                    subtitle = f"Reuniendo datos: {valid_secs} de {need_secs} s válidos"
             card(0, 216, fill=_tint(color), outline=color, line=2)
             d.text((20, 18), "NIVEL DE FATIGA", font=section, fill=ui.MUTED)
             d.text((20, 40), name, font=_fit_font(d, name, True, 46, width - 40), fill=color)
