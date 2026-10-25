@@ -56,7 +56,7 @@ def draw_hud(img, monitor, perclos_val, has_glasses, is_microsleep, is_yawning):
     reliable = monitor.closure_reliable
     if monitor.phase == monitor.FASE_MONITOREO and not reliable:
         cv2.putText(img, "NO FIABLE", (160, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 140, 255), 1)
-    elif monitor.perclos_total_time < monitor.perclos_min_seconds:
+    elif monitor.perclos.total_time < monitor.perclos_min_seconds:
         cv2.putText(img, "calibrando", (160, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
 
     color_perclos = ((0, 255, 120) if perclos_val < monitor.PERCLOS_WARN_PCT

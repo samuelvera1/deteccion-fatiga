@@ -12,6 +12,7 @@ import fatigue_hud
 import fatigue_report
 from fatigue_config import Thresholds
 from fatigue_core import FaceMeshDetector
+from fatigue_perclos import PerclosWindow
 from fatigue_pose import HeadPoseTracker
 from fatigue_profile import LandmarkStabilityGate, SubjectProfile
 from session_recorder import FrameRecorder, SessionRecorder
@@ -107,11 +108,7 @@ class FatigueMonitor(Thresholds):
         self.fps_estimate = 30                # solo para los parámetros de parpadeo, aún en frames
         # PERCLOS ponderado por tiempo real (independiente de los fps): (t, dt, cerrado) en la ventana.
         # Denominador mínimo perclos_min_seconds: al inicio un solo parpadeo no puede inflar el PERCLOS.
-        self.perclos_history = deque()
-        self.perclos_closed_time = 0.0
-        self.perclos_total_time = 0.0
-        self._perclos_last_t = None
-        self.perclos_val = 0.0
+        self.perclos = PerclosWindow(window_seconds, perclos_min_seconds)
 
         self.ipd = None
         # Gafas según la condición declarada: True / False, o None si no se declaró
@@ -139,6 +136,10 @@ class FatigueMonitor(Thresholds):
     def _write_trace(self, now, left_ear, right_ear, ear, mouth):
         if self.session and self.session.save_trace:
             self.session.trace(fatigue_report.trace_row(self, now, left_ear, right_ear, ear, mouth))
+
+    @property
+    def perclos_val(self):
+        return self.perclos.value
 
     def _log_pose_out_of_range(self, duration):
         self._log_event("POSTURA_FUERA_DE_RANGO", self.perclos_val, self.has_glasses, 0.0, duration)
@@ -301,24 +302,6 @@ class FatigueMonitor(Thresholds):
         return [max(neutral * factor, neutral + min_delta) for factor, min_delta, _ in self.yawn_tiers]
 
     # ------------------------------------------------------------------ detección de eventos
-
-    def _update_perclos(self, is_closed, now):
-        """PERCLOS ponderado por tiempo real en una ventana de window_seconds; el denominador nunca baja
-        de perclos_min_seconds. Cada frame pesa el tiempo transcurrido desde el anterior (máx. 0.2 s,
-        para que una pausa del vídeo o de la cámara no pese de más)."""
-        dt = 0.0 if self._perclos_last_t is None else min(max(now - self._perclos_last_t, 0.0), 0.2)
-        self._perclos_last_t = now
-        self.perclos_history.append((now, dt, is_closed))
-        self.perclos_total_time += dt
-        self.perclos_closed_time += dt if is_closed else 0.0
-        while self.perclos_history and self.perclos_history[0][0] < now - self.window_seconds:
-            _, old_dt, old_closed = self.perclos_history.popleft()
-            self.perclos_total_time -= old_dt
-            self.perclos_closed_time -= old_dt if old_closed else 0.0
-
-        denominator = max(self.perclos_total_time, self.perclos_min_seconds)
-        self.perclos_val = max(0.0, self.perclos_closed_time / denominator * 100.0)
-        return self.perclos_val
 
     def _update_yawn(self, mouth, now, ear, shape=None):
         """Bostezo de dos niveles. Devuelve (bostezo_en_curso, bloquea_parpadeos).
@@ -507,10 +490,10 @@ class FatigueMonitor(Thresholds):
         closure = self.profile.closure(ear)
         if pose_valid:
             self._update_blinks(ear, yawn_blocks_blinks, occluded, closure >= self.MICROSLEEP_EXIT_CLOSURE, now)
-            self._update_perclos(closure >= self.P80_CLOSURE, now)
+            self.perclos.update(closure >= self.P80_CLOSURE, now)
         else:
             self.blink_closed, self.blink_closed_frames = False, 0   # se descarta el episodio en curso
-            self._perclos_last_t = None                               # el hueco no pesa en el PERCLOS
+            self.perclos.skip_gap()                                   # el hueco no pesa en el PERCLOS
 
         # Cierre sostenido con histéresis: entra con >= 80 %, sale por debajo de 70 %
         self.eyes_closed = closure >= (self.MICROSLEEP_EXIT_CLOSURE if self.eyes_closed else self.P80_CLOSURE)
@@ -634,7 +617,7 @@ class FatigueMonitor(Thresholds):
         is_yawning, yawn_blocks_blinks = self._update_yawn(mouth, now, ear, shape)
         pose_valid = self.head.track_range(now)
         is_microsleep = self._update_eyes(ear, yawn_blocks_blinks, False, now, pose_valid)
-        level = self.alert.update(now, self.perclos_val, self.perclos_total_time, is_microsleep)
+        level = self.alert.update(now, self.perclos_val, self.perclos.total_time, is_microsleep)
         if level is not None:
             self._log_event("NIVEL_FATIGA", self.perclos_val, self.has_glasses, ear, value=level)
             if level != NORMAL:
