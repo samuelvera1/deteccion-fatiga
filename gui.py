@@ -104,11 +104,11 @@ class Window(ctk.CTk):
         self.attributes("-topmost", True)
         self.after(200, lambda: self.attributes("-topmost", False))
         self.mainloop()
-        for after_id in self.tk.eval("after info").split():      # callbacks pendientes de CustomTkinter
-            try:
-                self.after_cancel(after_id)
-            except Exception:
-                pass
+        # CustomTkinter deja programados algunos callbacks (animación de botones, escala de pantalla) que se
+        # disparan ya con la ventana destruida y Tcl los muestra como "invalid command name" en la consola. Es
+        # inofensivo: se silencian los errores de fondo de Tcl. NO se cancelan esos callbacks a mano: cada widget
+        # los borra al destruirse y, si ya no existen, destroy() falla con "can't delete Tcl command".
+        self.tk.eval("proc bgerror {args} {}")
         self.destroy()
         return self.result
 
@@ -174,8 +174,10 @@ class StartWindow(Window):
 
         buttons = ctk.CTkFrame(body, fg_color="transparent")
         buttons.pack(fill="x", pady=(22, 0))
-        button(buttons, "Empezar", self.start, primary=True).pack(side="left", fill="x", expand=True)
-        button(buttons, "Salir", self.close, width=120).pack(side="left", padx=(12, 0))
+        self.start_button = button(buttons, "Empezar", self.start, primary=True)
+        self.start_button.pack(side="left", fill="x", expand=True)
+        self.exit_button = button(buttons, "Salir", self.close, width=120)
+        self.exit_button.pack(side="left", padx=(12, 0))
         label(body, "Herramienta de investigación. No es un dispositivo médico.", 11, color=FAINT).pack(pady=(14, 0))
 
         self.bind("<Return>", lambda event: self.start())
@@ -200,9 +202,12 @@ class SummaryWindow(Window):
 
         buttons = ctk.CTkFrame(body, fg_color="transparent")
         buttons.pack(side="bottom", fill="x", pady=(14, 0))
-        button(buttons, "Abrir carpeta", self.open_folder, primary=True).pack(side="left", fill="x", expand=True)
-        button(buttons, "Nueva sesión", lambda: self.close("new"), width=130).pack(side="left", padx=(10, 0))
-        button(buttons, "Cerrar", self.close, width=100).pack(side="left", padx=(10, 0))
+        self.open_button = button(buttons, "Abrir carpeta", self.open_folder, primary=True)
+        self.open_button.pack(side="left", fill="x", expand=True)
+        self.new_button = button(buttons, "Nueva sesión", lambda: self.close("new"), width=130)
+        self.new_button.pack(side="left", padx=(10, 0))
+        self.close_button = button(buttons, "Cerrar", self.close, width=100)
+        self.close_button.pack(side="left", padx=(10, 0))
         label(body, "Resumen de la sesión", 24, True).pack(anchor="w")
         who = ctk.CTkFrame(body, fg_color="transparent")
         who.pack(anchor="w", pady=(3, 0))
@@ -309,8 +314,10 @@ class CameraErrorWindow(Window):
             anchor="w", pady=(10, 0))
         buttons = ctk.CTkFrame(body, fg_color="transparent")
         buttons.pack(side="bottom", anchor="e")
-        button(buttons, "Reintentar", lambda: self.close("retry"), primary=True, width=130).pack(side="right")
-        button(buttons, "Salir", self.close, width=100).pack(side="right", padx=(0, 10))
+        self.retry_button = button(buttons, "Reintentar", lambda: self.close("retry"), primary=True, width=130)
+        self.retry_button.pack(side="right")
+        self.exit_button = button(buttons, "Salir", self.close, width=100)
+        self.exit_button.pack(side="right", padx=(0, 10))
         self.bind("<Return>", lambda event: self.close("retry"))
         self.bind("<Escape>", lambda event: self.close())
 
