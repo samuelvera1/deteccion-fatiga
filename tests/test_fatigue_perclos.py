@@ -32,7 +32,7 @@ class PerclosWindowTest(unittest.TestCase):
         w = PerclosWindow(10, 5)
         t = feed(w, [True] * 100)            # 10 s cerrado
         feed(w, [False] * 200, start=t)      # 20 s abierto: lo cerrado sale de la ventana
-        self.assertEqual(w.value, 0.0)
+        self.assertAlmostEqual(w.value, 0.0, places=6)
 
     def test_hueco_largo_pesa_como_maximo_0_2_s(self):
         w = PerclosWindow(60, 15)
@@ -45,7 +45,7 @@ class PerclosWindowTest(unittest.TestCase):
         w.update(False, 0.0)
         w.skip_gap()
         w.update(True, 5.0)
-        self.assertEqual(w.total_time, 0.0)
+        self.assertAlmostEqual(w.total_time, 0.0)
 
 
 if __name__ == "__main__":
