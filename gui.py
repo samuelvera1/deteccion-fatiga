@@ -196,7 +196,7 @@ class SummaryWindow(Window):
     def __init__(self, view):
         super().__init__("Resumen de la sesión")
         self.view = view
-        ok = view["reliable"]
+        ok = view["reliable"] and view["counted"]      # sin datos fiables se atenúa todo
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=MARGIN, pady=(18, 18))
 
@@ -218,13 +218,11 @@ class SummaryWindow(Window):
         label(when, f"{view['when']} · Duración ", 13, color=MUTED).pack(side="left")
         label(when, view["duration"], 13, True).pack(side="left")
 
-        if not ok or not view["counted"]:
-            text = ("⚠ El ojo cerrado no se midió bien: el PERCLOS y las alertas de esta sesión no son fiables."
-                    if not ok else "⚠ La sesión terminó antes de empezar el conteo: no hay datos que mostrar.")
+        if view["warning"]:
             warning = ctk.CTkFrame(body, fg_color=WARN_BG, border_width=1, border_color=WARN, corner_radius=10)
             warning.pack(fill="x", pady=(14, 0))
-            label(warning, text, 13, color=WARN, wraplength=WIDTH - 2 * MARGIN - 28, justify="left").pack(
-                anchor="w", padx=14, pady=10)
+            label(warning, f"⚠ {view['warning']}", 13, color=WARN, wraplength=WIDTH - 2 * MARGIN - 28,
+                  justify="left").pack(anchor="w", padx=14, pady=10)
 
         stats = ctk.CTkFrame(body, fg_color="transparent")
         stats.pack(fill="x", pady=(14, 0))

@@ -62,6 +62,7 @@ class SummaryViewTest(unittest.TestCase):
         self.assertEqual(view["perclos_sub"], "ventana de 60 s")
         self.assertEqual(view["build"], "v1.0.0 · commit cc1e94b")
         self.assertTrue(view["counted"])
+        self.assertIsNone(view["warning"])
 
     def test_niveles_suman_el_total(self):
         view = sv.summary_view(make_meta(), True, "sesiones/x")
@@ -79,6 +80,7 @@ class SummaryViewTest(unittest.TestCase):
         view = sv.summary_view(make_meta(), False, "sesiones/x")
         self.assertFalse(view["reliable"])
         self.assertEqual(view["perclos_sub"], "no fiable")
+        self.assertIn("ojo cerrado no se midió bien", view["warning"])
 
     def test_sin_conteo_no_divide_por_cero(self):
         meta = make_meta()
@@ -87,6 +89,16 @@ class SummaryViewTest(unittest.TestCase):
         view = sv.summary_view(meta, True, "sesiones/x")
         self.assertFalse(view["counted"])
         self.assertEqual([lv["percent"] for lv in view["levels"]], ["—"] * 4)
+        self.assertIn("terminó antes de completar la calibración", view["warning"])
+
+    def test_sesion_cortada_no_culpa_al_ojo_cerrado(self):
+        """Si no llegó a empezar el conteo, el aviso es ese aunque el ojo cerrado tampoco se haya medido."""
+        meta = make_meta()
+        meta["resumen"]["inicio_monitoreo_s"] = None
+        meta["resumen"]["fatiga"] = {"tiempo_por_nivel_s": {}, "alertas": {}}
+        view = sv.summary_view(meta, False, "sesiones/x")
+        self.assertIn("calibración", view["warning"])
+        self.assertNotIn("ojo cerrado", view["warning"])
 
     def test_sesion_real_guardada_por_el_programa(self):
         """Una sesión de verdad (si existe en este equipo) se convierte sin errores."""

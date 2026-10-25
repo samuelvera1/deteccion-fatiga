@@ -53,13 +53,21 @@ def summary_view(meta, reliable, folder):
     mean_blink = summary.get("duracion_media_parpadeo_s")
     commit = ((meta.get("git") or {}).get("commit") or "")[:7]
     software = meta.get("software") or {}
+    counted = summary.get("inicio_monitoreo_s") is not None and total > 0
+    if not counted:
+        warning = "La sesión terminó antes de completar la calibración: no hay datos que mostrar."
+    elif not reliable:
+        warning = "El ojo cerrado no se midió bien: el PERCLOS y las alertas de esta sesión no son fiables."
+    else:
+        warning = None
     return {
         "participant": "Anónimo" if subject == "anonimo" else subject,
         "glasses": GLASSES.get(meta.get("condicion"), "Gafas: no indicado"),
         "when": datetime.fromisoformat(meta["inicio"]).strftime("%d/%m/%Y · %H:%M"),
         "duration": clock(summary["duracion_s"]),
         "reliable": bool(reliable),
-        "counted": summary.get("inicio_monitoreo_s") is not None and total > 0,
+        "counted": counted,
+        "warning": warning,
         "blinks": str(blinks),
         "blinks_sub": [plural(long_blinks, "prolongado", "prolongados"),
                        f"media {decimal(mean_blink, 2)} s" if mean_blink else "sin duración media"],
