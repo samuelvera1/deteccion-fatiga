@@ -35,8 +35,8 @@ def draw_hud(img, monitor, perclos_val, has_glasses, is_microsleep, is_yawning):
                     (30, 129), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (120, 120, 130), 1)
 
     cv2.putText(img, "BOSTEZOS", (140, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (160, 160, 170), 1)
-    cv2.putText(img, f"{monitor.yawn_count}", (140, 115), cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 230, 255), 2)
-    cv2.putText(img, f"micro {monitor.micro_yawn_count}", (180, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
+    cv2.putText(img, f"{monitor.yawn.count}", (140, 115), cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 230, 255), 2)
+    cv2.putText(img, f"micro {monitor.yawn.micro_count}", (180, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 130), 1)
 
     cv2.line(img, (30, 135), (panel_w - 15, 135), (50, 50, 60), 1)
 

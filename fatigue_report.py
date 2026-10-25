@@ -50,8 +50,8 @@ def session_parameters(monitor):
                  "giro_rapido_cierre_min": monitor.P80_CLOSURE,
                  "microsueno_cierre_min": monitor.P80_CLOSURE, "microsueno_min_s": monitor.MICROSLEEP_SECONDS,
                  "microsueno_cierre_salida": monitor.MICROSLEEP_EXIT_CLOSURE},
-        "bostezo": {"exagerado_factor_delta_seg": monitor.yawn_tiers[monitor.YAWN_TIER_EXAGGERATED],
-                    "micro_factor_delta_seg": monitor.yawn_tiers[monitor.YAWN_TIER_MICRO],
+        "bostezo": {"exagerado_factor_delta_seg": monitor.yawn.tiers[monitor.yawn.TIER_EXAGGERATED],
+                    "micro_factor_delta_seg": monitor.yawn.tiers[monitor.yawn.TIER_MICRO],
                     "hueco_tolerado_frames": monitor.YAWN_GAP_FRAMES,
                     "sonrisa_ancho_min_ratio": monitor.SMILE_MIN_WIDTH_RATIO,
                     "sonrisa_mandibula_max_ipd": monitor.SMILE_MAX_JAW_DROP,
@@ -79,7 +79,7 @@ def trace_row(monitor, now, left_ear, right_ear, ear, mouth):
 
     calibrated = monitor.profile.is_calibrated
     closure = monitor.profile.closure(ear) if monitor.profile.is_closed_calibrated else None
-    yawn_thr, micro_thr = monitor._yawn_thresholds() if calibrated else (None, None)
+    yawn_thr, micro_thr = monitor.yawn.thresholds() if calibrated else (None, None)
     p, shape = monitor.profile, monitor._last_shape
     if shape is not None and p.neutral_mouth_width:
         width_rel = shape[0] / p.neutral_mouth_width
@@ -93,9 +93,9 @@ def trace_row(monitor, now, left_ear, right_ear, ear, mouth):
             fmt(mouth), fmt(p.neutral_mouth_ratio), fmt(yawn_thr), fmt(micro_thr),
             "" if monitor.has_glasses is None else int(monitor.has_glasses), monitor.phase,
             monitor.stability.stable_frames, fmt(monitor.stability.motion),
-            monitor.blink_count, monitor.yawn_count,
-            monitor.micro_yawn_count, fmt(monitor.blink_ref), int(monitor.blink_closed),
-            fmt(width_rel), fmt(lift_delta), fmt(jaw_delta), int(monitor._is_smile(shape)),
+            monitor.blink_count, monitor.yawn.count,
+            monitor.yawn.micro_count, fmt(monitor.blink_ref), int(monitor.blink_closed),
+            fmt(width_rel), fmt(lift_delta), fmt(jaw_delta), int(monitor.yawn.is_smile(shape)),
             *(fmt(a) for a in (monitor.head.pose or (None, None, None))),
             int(monitor.head.eye_valid), monitor.frames_total - 1, fmt(monitor.head.speed)]
 
@@ -119,12 +119,12 @@ def session_summary(monitor):
                                              if monitor.blink_durations else None),
         "duracion_media_parpadeo_s": (round(float(np.mean(monitor.blink_durations)), 4)
                                       if monitor.blink_durations else None),
-        "bostezos": monitor.yawn_count,
-        "micro_bostezos": monitor.micro_yawn_count,
-        "duracion_media_bostezo_s": (round(float(np.mean(monitor.yawn_durations)), 4)
-                                     if monitor.yawn_durations else None),
+        "bostezos": monitor.yawn.count,
+        "micro_bostezos": monitor.yawn.micro_count,
+        "duracion_media_bostezo_s": (round(float(np.mean(monitor.yawn.durations)), 4)
+                                     if monitor.yawn.durations else None),
         "parpadeos_descartados_giro": monitor.fast_turn_rejected,
-        "sonrisas_descartadas": monitor.smile_count,
+        "sonrisas_descartadas": monitor.yawn.smile_count,
         "tiempo_postura_fuera_de_rango_s": round(monitor.head.out_time, 2),
         "perclos_final_pct": round(monitor.perclos_val, 2),
         "recalibraciones": monitor.recalibration_count,

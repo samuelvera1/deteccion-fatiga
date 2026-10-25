@@ -14,6 +14,7 @@ from fatigue_config import Thresholds
 from fatigue_core import FaceMeshDetector
 from fatigue_perclos import PerclosWindow
 from fatigue_pose import HeadPoseTracker
+from fatigue_yawn import YawnDetector
 from fatigue_profile import LandmarkStabilityGate, SubjectProfile
 from session_recorder import FrameRecorder, SessionRecorder
 
@@ -74,12 +75,6 @@ class FatigueMonitor(Thresholds):
         self.capture_size = capture_size
         self.sessions_dir = sessions_dir
         self.session = None
-        # Umbral de cada nivel = max(factor * boca neutra, boca neutra + min_delta) en unidades de IPD.
-        # El margen mínimo es necesario porque con labios cerrados la boca neutra es ~0 y
-        # 1.3x de ~0 lo superaría cualquier sílaba.
-        self.yawn_tiers = [(yawn_factor, yawn_min_delta, yawn_min_seconds),                    # exagerado
-                           (micro_yawn_factor, micro_yawn_min_delta, micro_yawn_min_seconds)]  # micro/sutil
-        self.yawn_min_delta = yawn_min_delta
         self.window_seconds = window_seconds
         self.perclos_min_seconds = perclos_min_seconds
 
@@ -89,20 +84,19 @@ class FatigueMonitor(Thresholds):
                                          refineLandmarks=refine_landmarks)
         self.profile = SubjectProfile(calibration_frames)
         self.stability = LandmarkStabilityGate(required_frames=15)
+        self.yawn = YawnDetector(self.profile,
+                                 [(yawn_factor, yawn_min_delta, yawn_min_seconds),                    # exagerado
+                                  (micro_yawn_factor, micro_yawn_min_delta, micro_yawn_min_seconds)],  # micro/sutil
+                                 self._log_yawn_event)
 
         self._on_blink = None
-        self._on_yawn = None
 
         self.blink_count = 0
         self.long_blink_count = 0             # parpadeos prolongados (>= LONG_BLINK_SECONDS, sin micro-sueño)
         self.blink_durations = []             # duración (s) de cada parpadeo normal y prolongado
-        self.yawn_count = 0                   # total (exagerados + micro)
-        self.micro_yawn_count = 0
-        self.smile_count = 0                  # episodios de boca abierta descartados como sonrisa
         self._last_shape = None
         self.head = HeadPoseTracker(self.POSE_MAX_PITCH, self.POSE_MAX_YAW, self.POSE_STABLE_MAX,
                                     self._log_pose_out_of_range)
-        self.yawn_durations = []              # duración (s) de la apertura bucal de cada bostezo contado
         self.fast_turn_rejected = 0           # caídas de apertura descartadas por giro rápido de cabeza
 
         self.fps_estimate = 30                # solo para los parámetros de parpadeo, aún en frames
@@ -148,7 +142,10 @@ class FatigueMonitor(Thresholds):
         self._on_blink = callback_function
 
     def on_yawn(self, callback_function):
-        self._on_yawn = callback_function
+        self.yawn.on_yawn = callback_function
+
+    def _log_yawn_event(self, event_type, ear, duration, end_time):
+        self._log_event(event_type, self.perclos_val, self.has_glasses, ear, duration, end_time=end_time)
 
     # ------------------------------------------------------------------ calibración
 
@@ -167,15 +164,8 @@ class FatigueMonitor(Thresholds):
         self.blink_ref = None
         self._ear_history = deque()           # (t, apertura) del último segundo, para la referencia local
         self._last_blink_ref = None
-        self.yawn_run_start = [None, None]    # inicio de la racha sostenida de cada nivel
-        self.yawn_run_gap = [0, 0]            # frames consecutivos por debajo del umbral de cada nivel
-        self.yawn_counted = False
-        self.yawn_exaggerated = False         # el episodio actual alcanzó el nivel 1
-        self.yawn_cooldown_until = 0.0
-        self.yawn_episode_start = None        # inicio del episodio de boca abierta en curso
-        self.yawn_last_open = None            # último instante con la boca sobre el umbral micro
+        self.yawn.reset()
         self.blink_max_head_speed = 0.0       # giro de cabeza máximo (°/s) durante el cierre en curso
-        self.yawn_smile_seen = False          # el episodio en curso tuvo forma de sonrisa
         self._closed_phase_started = None
         self._closed_attempt = 1              # intento actual del paso de ojos cerrados
         self._closed_retry_until = None       # fin de la pausa antes del siguiente intento
@@ -284,91 +274,7 @@ class FatigueMonitor(Thresholds):
         self.ipd = raw_ipd if self.ipd is None else self.ipd + self.IPD_SMOOTHING * (raw_ipd - self.ipd)
         return self.ipd
 
-    def _is_smile(self, shape):
-        """Sonrisa (FACS, AU12 'lip corner puller'): boca claramente más ancha que en reposo sin la caída de
-        mandíbula propia del bostezo. Umbrales PROVISIONALES ajustados con datos sin etiquetar (ver
-        SMILE_MIN_WIDTH_RATIO). La elevación de comisuras se sigue registrando en la traza, pero no decide."""
-        p = self.profile
-        # Sin un ancho de boca neutro válido (malla degenerada) no se decide: si no, todo parecería sonrisa
-        if shape is None or p.neutral_mouth_width is None or p.neutral_mouth_width < 0.1:
-            return False
-        width, jaw, _ = shape
-        return (width >= p.neutral_mouth_width * self.SMILE_MIN_WIDTH_RATIO
-                and jaw - p.neutral_jaw < self.SMILE_MAX_JAW_DROP)
-
-    def _yawn_thresholds(self):
-        """Umbral de apertura bucal de cada nivel: [exagerado, micro]."""
-        neutral = self.profile.neutral_mouth_ratio
-        return [max(neutral * factor, neutral + min_delta) for factor, min_delta, _ in self.yawn_tiers]
-
     # ------------------------------------------------------------------ detección de eventos
-
-    def _update_yawn(self, mouth, now, ear, shape=None):
-        """Bostezo de dos niveles. Devuelve (bostezo_en_curso, bloquea_parpadeos).
-        Se cuenta en cuanto se cumple cualquier nivel (aviso inmediato); el tipo (BOSTEZO o
-        MICRO_BOSTEZO) se registra al terminar el episodio, porque un bostezo exagerado siempre
-        cumple antes el nivel micro (umbral más bajo y duración más corta).
-        Mientras la forma de la boca sea de sonrisa (_is_smile) el episodio no se cuenta; si termina sin
-        contarse y hubo sonrisa, se registra un evento SONRISA (para poder revisar los descartes)."""
-        if now < self.yawn_cooldown_until and self.yawn_run_start[self.YAWN_TIER_MICRO] is None:
-            return False, True
-
-        for tier, threshold in enumerate(self._yawn_thresholds()):
-            if mouth > threshold:
-                if self.yawn_run_start[tier] is None:
-                    self.yawn_run_start[tier] = now
-                    if tier == self.YAWN_TIER_MICRO:
-                        self.yawn_episode_start, self.yawn_smile_seen = now, False
-                if tier == self.YAWN_TIER_MICRO:
-                    self.yawn_last_open = now     # último frame con la boca sobre el umbral (fin del episodio)
-                self.yawn_run_gap[tier] = 0
-            elif self.yawn_run_start[tier] is not None:
-                self.yawn_run_gap[tier] += 1
-                if self.yawn_run_gap[tier] > self.YAWN_GAP_FRAMES:
-                    self.yawn_run_start[tier] = None
-
-        smiling = self.yawn_run_start[self.YAWN_TIER_MICRO] is not None and self._is_smile(shape)
-        self.yawn_smile_seen = self.yawn_smile_seen or smiling
-        # Un episodio que mostró forma de sonrisa solo puede contarse como bostezo si aparece después la
-        # señal propia del bostezo (caída de mandíbula); si no, al cerrar la boca (frames de tolerancia) la
-        # forma deja de ser de sonrisa y el episodio se colaba como bostezo.
-        jaw_drop = (shape[1] - self.profile.neutral_jaw
-                    if shape is not None and self.profile.neutral_jaw is not None else None)
-        vetoed = smiling or (self.yawn_smile_seen and not (jaw_drop is not None and jaw_drop >= self.SMILE_MAX_JAW_DROP))
-        sustained = [start is not None and now - start >= min_seconds
-                     for start, (_, _, min_seconds) in zip(self.yawn_run_start, self.yawn_tiers)]
-        if sustained[self.YAWN_TIER_EXAGGERATED] and not vetoed:
-            self.yawn_exaggerated = True
-        if any(sustained) and not self.yawn_counted and not vetoed:
-            self.yawn_counted = True
-            self.yawn_count += 1
-            if self._on_yawn:
-                self._on_yawn(self.yawn_count)
-
-        if self.yawn_run_start[self.YAWN_TIER_MICRO] is None:      # fin del episodio
-            # El episodio se cierra YAWN_GAP_FRAMES frames después de que la boca baje del umbral:
-            # el evento se registra en el último frame con la boca abierta, con la duración de la apertura
-            start, end = self.yawn_episode_start, self.yawn_last_open
-            duration = end - start if start is not None and end is not None else None
-            if self.yawn_counted:
-                if not self.yawn_exaggerated:
-                    self.micro_yawn_count += 1
-                if duration is not None:
-                    self.yawn_durations.append(duration)
-                self._log_event("BOSTEZO" if self.yawn_exaggerated else "MICRO_BOSTEZO",
-                                self.perclos_val, self.has_glasses, ear, duration, end_time=end)
-                self.yawn_cooldown_until = now + self.YAWN_COOLDOWN_SECONDS
-            elif self.yawn_smile_seen and start is not None:
-                self.smile_count += 1
-                self._log_event("SONRISA", self.perclos_val, self.has_glasses, ear, duration, end_time=end)
-            self.yawn_run_start[self.YAWN_TIER_EXAGGERATED] = None
-            self.yawn_counted = False
-            self.yawn_exaggerated = False
-            self.yawn_episode_start, self.yawn_smile_seen, self.yawn_last_open = None, False, None
-
-        is_yawning = self.yawn_counted
-        # Solo un bostezo confirmado bloquea parpadeos (hablar no debe bloquearlos)
-        return is_yawning, is_yawning or now < self.yawn_cooldown_until
 
     def _local_blink_reference(self, ear, now, eye_shut):
         """Percentil alto de la apertura entre BLINK_REF_WINDOW[0] y [1] s antes de `now`.
@@ -614,7 +520,7 @@ class FatigueMonitor(Thresholds):
             return False, False
 
         # Paso 3: monitoreo adaptativo
-        is_yawning, yawn_blocks_blinks = self._update_yawn(mouth, now, ear, shape)
+        is_yawning, yawn_blocks_blinks = self.yawn.update(mouth, now, ear, shape)
         pose_valid = self.head.track_range(now)
         is_microsleep = self._update_eyes(ear, yawn_blocks_blinks, False, now, pose_valid)
         level = self.alert.update(now, self.perclos_val, self.perclos.total_time, is_microsleep)
