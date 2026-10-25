@@ -9,6 +9,7 @@ from fatigue_alert import FatigueAlert, MESSAGES, COLORS_BGR, NORMAL
 import fatigue_audio
 import fatigue_geometry
 import fatigue_hud
+import fatigue_report
 from fatigue_config import Thresholds
 from fatigue_core import FaceMeshDetector
 from fatigue_profile import LandmarkStabilityGate, SubjectProfile
@@ -130,72 +131,9 @@ class FatigueMonitor(Thresholds):
 
     # ------------------------------------------------------------------ registro
 
-    TRACE_HEADER = ["t", "ipd", "ear_left", "ear_right", "ear", "ear_baseline", "ear_cerrado", "cierre",
-                    "p80", "eyes_closed", "mouth", "mouth_neutral", "yawn_thr", "micro_yawn_thr",
-                    "gafas_declaradas", "fase", "estable", "movimiento",
-                    "parpadeos", "bostezos", "micro_bostezos", "blink_ref", "blink_closed",
-                    "boca_ancho_rel", "comisuras_elev", "mandibula_caida", "sonrisa",
-                    "cabeza_yaw", "cabeza_pitch", "cabeza_roll", "postura_valida",
-                    "frame",   # índice del frame en la fuente (0 = primero); los frames sin rostro no tienen fila
-                    "cabeza_vel"]   # velocidad de giro de la cabeza (°/s)
-
     def parameters(self):
         """Todos los parámetros del método, para los metadatos de la sesión (sección de métodos)."""
-        return {
-            "camara": {"resolucion_pedida": list(self.capture_size) if self.capture_size else "nativa"},
-            "facemesh": {"min_detection_confidence": self.detector.minDetectionCon,
-                         "min_tracking_confidence": self.detector.minTrackCon,
-                         "refine_landmarks": self.detector.refineLandmarks},
-            "calibracion": {"frames_perfil": self.profile.calibration_frames,
-                            "frames_ojo_cerrado": self.profile.closed_frames,
-                            "captura_ojo_cerrado_factor": self.CLOSED_CAPTURE_FACTOR,
-                            "timeout_ojo_cerrado_s": self.CLOSED_CALIBRATION_TIMEOUT,
-                            "intentos_ojo_cerrado_en_vivo": self.CLOSED_MAX_ATTEMPTS,
-                            "pausa_entre_intentos_s": self.CLOSED_RETRY_PAUSE,
-                            "reserva_ojo_cerrado_ratio": self.CLOSED_FALLBACK_RATIO,
-                            "cierre_visible_max_ratio": self.CLOSURE_VISIBLE_MAX_RATIO,
-                            "reapertura_cierre_max": self.REOPEN_MAX_CLOSURE,
-                            "reapertura_frames": self.REOPEN_FRAMES,
-                            "modo": "manual (marcas del vídeo)" if self.manual_marks else "automatica",
-                            "marcas_manuales": self.manual_marks,
-                            "frames_estables_requeridos": self.stability.required_frames,
-                            "max_movimiento_ipd": self.stability.max_motion,
-                            "suavizado_ipd": self.IPD_SMOOTHING},
-            "ojos": {"parpadeo_factor_ref_local": self.BLINK_LOCAL_FACTOR,
-                     "parpadeo_margen_reapertura": self.BLINK_REOPEN_MARGIN,
-                     "parpadeo_margen_1_frame": self.BLINK_DEEP_MARGIN,
-                     "parpadeo_ventana_ref_s": self.BLINK_REF_WINDOW,
-                     "parpadeo_percentil_ref": self.BLINK_REF_PERCENTILE,
-                     "parpadeo_min_frames": self.MIN_BLINK_FRAMES,
-                     "parpadeo_prolongado_min_s": self.LONG_BLINK_SECONDS,
-                     "parpadeo_prolongado_cierre_min": self.LONG_BLINK_MIN_CLOSURE,
-                     "rafaga_cierre_pico": self.BURST_PEAK_CLOSURE,
-                     "rafaga_reapertura_parcial": self.BURST_REOPEN_CLOSURE,
-                     "refractario_parpadeo_frames": self.BLINK_REFRACTORY_FRAMES,
-                     "giro_rapido_cabeza_gs": self.FAST_HEAD_SPEED,
-                     "giro_rapido_cierre_min": self.P80_CLOSURE,
-                     "microsueno_cierre_min": self.P80_CLOSURE, "microsueno_min_s": self.MICROSLEEP_SECONDS,
-                     "microsueno_cierre_salida": self.MICROSLEEP_EXIT_CLOSURE},
-            "bostezo": {"exagerado_factor_delta_seg": self.yawn_tiers[self.YAWN_TIER_EXAGGERATED],
-                        "micro_factor_delta_seg": self.yawn_tiers[self.YAWN_TIER_MICRO],
-                        "hueco_tolerado_frames": self.YAWN_GAP_FRAMES,
-                        "sonrisa_ancho_min_ratio": self.SMILE_MIN_WIDTH_RATIO,
-                        "sonrisa_mandibula_max_ipd": self.SMILE_MAX_JAW_DROP,
-                        "enfriamiento_s": self.YAWN_COOLDOWN_SECONDS},
-            "perclos": {"definicion": "P80", "cierre_min": self.P80_CLOSURE, "incluye_parpadeos": True,
-                        "ventana_s": self.window_seconds, "denominador_minimo_s": self.perclos_min_seconds,
-                        "ponderado_por_tiempo": True,
-                        "hud_precaucion_pct": self.PERCLOS_WARN_PCT, "hud_alerta_pct": self.PERCLOS_ALERT_PCT},
-            "kss": self.kss.parameters() if self.kss else {"activa": False},
-            "alertas_fatiga": self.alert.parameters(),
-            "gafas": {"origen": "condición declarada por el investigador (--condicion)",
-                      "declaradas": self.has_glasses,
-                      "cambio_a_mitad_de_sesion": "recalibrar con la tecla C"},
-            "postura": {"referencia": "postura media de la calibración (mirando al frente)",
-                        "max_pitch_metricas_ojo": self.POSE_MAX_PITCH, "max_yaw_metricas_ojo": self.POSE_MAX_YAW,
-                        "max_giro_estabilidad": self.POSE_STABLE_MAX,
-                        "fuera_de_rango": "no se cuentan parpadeos ni PERCLOS; micro-sueño sí (marcado)"},
-        }
+        return fatigue_report.session_parameters(self)
 
     def _log_event(self, event_type, perclos_val, has_glasses, ear_val, duration=None, end_time=None, value=None):
         """end_time: instante en que terminó el evento si no es el frame actual (t_s = fin del evento)."""
@@ -204,30 +142,8 @@ class FatigueMonitor(Thresholds):
                                    perclos_val, has_glasses, ear_val, duration, value)
 
     def _write_trace(self, now, left_ear, right_ear, ear, mouth):
-        if not (self.session and self.session.save_trace):
-            return
-        fmt = lambda v: "" if v is None else f"{v:.4f}"
-        calibrated = self.profile.is_calibrated
-        closure = self.profile.closure(ear) if self.profile.is_closed_calibrated else None
-        yawn_thr, micro_thr = self._yawn_thresholds() if calibrated else (None, None)
-        p, shape = self.profile, self._last_shape
-        if shape is not None and p.neutral_mouth_width:
-            width_rel = shape[0] / p.neutral_mouth_width
-            lift_delta, jaw_delta = shape[2] - p.neutral_corner_lift, shape[1] - p.neutral_jaw
-        else:
-            width_rel = lift_delta = jaw_delta = None
-        self.session.trace([f"{now:.3f}", fmt(self.ipd), fmt(left_ear), fmt(right_ear), fmt(ear),
-                                     fmt(self.profile.open_ear_baseline), fmt(self.profile.closed_ear_level),
-                                     fmt(closure), int(closure is not None and closure >= self.P80_CLOSURE),
-                                     int(self.eyes_closed),
-                                     fmt(mouth), fmt(self.profile.neutral_mouth_ratio), fmt(yawn_thr), fmt(micro_thr),
-                                     "" if self.has_glasses is None else int(self.has_glasses), self.phase,
-                                     self.stability.stable_frames, fmt(self.stability.motion),
-                                     self.blink_count, self.yawn_count,
-                                     self.micro_yawn_count, fmt(self.blink_ref), int(self.blink_closed),
-                                     fmt(width_rel), fmt(lift_delta), fmt(jaw_delta), int(self._is_smile(shape)),
-                                     *(fmt(a) for a in (self.head_pose or (None, None, None))),
-                                     int(self.eye_pose_valid), self.frames_total - 1, fmt(self.head_speed)])
+        if self.session and self.session.save_trace:
+            self.session.trace(fatigue_report.trace_row(self, now, left_ear, right_ear, ear, mouth))
 
     def on_blink(self, callback_function):
         self._on_blink = callback_function
@@ -841,7 +757,7 @@ class FatigueMonitor(Thresholds):
         source_type = ("video" if self._is_video_file()
                        else "stream" if "://" in str(self.video_source) else "camara")
         self.session.begin(self.video_source, source_type, clock, frame_size, native_fps, self.parameters())
-        self.session.open_trace(self.TRACE_HEADER)
+        self.session.open_trace(fatigue_report.TRACE_HEADER)
         if self.record and self._is_video_file():
             print("[AVISO] --grabar es para sesiones en vivo: el vídeo analizado ya es la grabación. Se ignora.")
         elif self.record:
@@ -913,39 +829,7 @@ class FatigueMonitor(Thresholds):
 
     def _finish_session(self, native_fps, use_video_clock):
         self._close_pose_interval()
-        metadata = self.session.finish({
-            "duracion_s": round(self._now, 2),
-            "calibracion_modo": "manual" if self.manual_marks else "automatica",
-            "kss": self.kss.responses if self.kss else None,
-            "fatiga": self.alert.summary(),
-            "inicio_monitoreo_s": None if self.test_start_s is None else round(self.test_start_s, 3),
-            "frames": self.frames_total,
-            "frames_con_rostro": self.frames_with_face,
-            "gafas_final": self.has_glasses,
-            "parpadeos": self.blink_count,
-            "parpadeos_prolongados": self.long_blink_count,
-            # Proporción de parpadeos de cierre largo (Caffier et al., 2003) y duración media del parpadeo
-            # (Ingre et al., 2006); incluyen parpadeos normales y prolongados, no micro-sueños
-            "proporcion_parpadeos_prolongados": (round(self.long_blink_count / len(self.blink_durations), 4)
-                                                 if self.blink_durations else None),
-            "duracion_media_parpadeo_s": (round(float(np.mean(self.blink_durations)), 4)
-                                          if self.blink_durations else None),
-            "bostezos": self.yawn_count,
-            "micro_bostezos": self.micro_yawn_count,
-            "duracion_media_bostezo_s": (round(float(np.mean(self.yawn_durations)), 4)
-                                         if self.yawn_durations else None),
-            "parpadeos_descartados_giro": self.fast_turn_rejected,
-            "sonrisas_descartadas": self.smile_count,
-            "tiempo_postura_fuera_de_rango_s": round(self.pose_out_time, 2),
-            "perclos_final_pct": round(self.perclos_val, 2),
-            "recalibraciones": self.recalibration_count,
-            "ojo_abierto_ref": self.profile.open_ear_baseline,
-            "ojo_cerrado_ref": self.profile.closed_ear_level,
-            "ojo_cerrado_medido": self.profile.closed_level_measured,
-            "ojo_cerrado_proporcion": self.profile.closed_ratio,
-            "ojo_cerrado_reutilizado_en_recalibracion": self.profile.closed_level_reused,
-            "paso_ojos_cerrados_apertura_min_ratio": self.profile.closed_phase_min_ratio,
-        })
+        metadata = self.session.finish(fatigue_report.session_summary(self))
 
         # Duraciones (parpadeo, micro-sueño, PERCLOS) van en segundos; solo el mínimo de frames de un parpadeo
         # y el periodo refractario siguen en frames y suponen fps_estimate

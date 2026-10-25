@@ -1,6 +1,7 @@
 {
  "sesiones/20261017_114229_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "50eaac17de786e6e5397c8ad65b55e518693c6b5eea295974faa59d2fa0479e0",
+  "parametros_sha256": "26698eec1f8666a8f06c2cec223060efdb53add9530c3de826d85b030560e89c",
   "resumen": {
    "bostezos": 3,
    "calibracion_modo": "automatica",
@@ -46,6 +47,7 @@
  },
  "sesiones/20261017_120014_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "cf51c49dedeb9fe4fac88bb31f78198238a663e4f7d5267ea10277498e9e1503",
+  "parametros_sha256": "26698eec1f8666a8f06c2cec223060efdb53add9530c3de826d85b030560e89c",
   "resumen": {
    "bostezos": 2,
    "calibracion_modo": "automatica",
@@ -91,6 +93,7 @@
  },
  "sesiones/20261017_120716_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "bc81dd46edb3d2c2bd66f8828887eb52583e0095cc571b63d6109889f2569996",
+  "parametros_sha256": "26698eec1f8666a8f06c2cec223060efdb53add9530c3de826d85b030560e89c",
   "resumen": {
    "bostezos": 1,
    "calibracion_modo": "automatica",

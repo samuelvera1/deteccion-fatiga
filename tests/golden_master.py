@@ -54,6 +54,8 @@ def analyze(video):
         resumen = json.loads(json.dumps(monitor.session.metadata["resumen"]))
         return {
             "resumen": resumen,
+            "parametros_sha256": hashlib.sha256(json.dumps(
+                monitor.session.metadata["parametros"], sort_keys=True, default=str).encode("utf-8")).hexdigest(),
             "traza_sha256": _sha(os.path.join(session_dir, "traza.csv")),
             "eventos_sha256": _sha(os.path.join(session_dir, "eventos.csv"), "Timestamp"),
         }
