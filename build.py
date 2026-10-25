@@ -43,10 +43,17 @@ def write_readme(folder, info):
         f.write(text)
 
 
+# Datos de participantes que nunca deben viajar dentro de la entrega, aunque alguien haya probado el .exe en la carpeta
+PRIVATE = ("sesiones", "participantes_privado.csv")
+
+
 def make_zip(folder, info):
     path = os.path.join(ROOT, "dist", f"{NAME}-{info['version']}-win64.zip")
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-        for base, _, files in os.walk(folder):
+        for base, dirs, files in os.walk(folder):
+            if base == folder:
+                dirs[:] = [d for d in dirs if d not in PRIVATE]
+                files = [f for f in files if f not in PRIVATE]
             for file in files:
                 full = os.path.join(base, file)
                 archive.write(full, os.path.join(NAME, os.path.relpath(full, folder)))
