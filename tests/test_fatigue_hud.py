@@ -106,6 +106,25 @@ class FatigueHudTest(unittest.TestCase):
         self.monitor.head.pose = None
         self.assertFalse(np.array_equal(by_time, self.render(FatigueMonitor.FASE_MONITOREO)))
 
+    def test_nivel_provisional_segun_el_perclos_que_se_lleva(self):
+        """Con datos incompletos (pero suficientes para estimar) se muestra un nivel provisional que depende del PERCLOS."""
+        self.monitor.perclos.total_time = 30.0
+        frames = {}
+        for value in (2.0, 9.0, 14.0):
+            self.monitor.perclos.value = value
+            frames[value] = self.render(FatigueMonitor.FASE_MONITOREO)
+        self.assertFalse(np.array_equal(frames[2.0], frames[9.0]))
+        self.assertFalse(np.array_equal(frames[9.0], frames[14.0]))
+
+    def test_provisional_solo_si_hay_datos_para_estimar(self):
+        self.monitor.perclos.value = 14.0
+        self.monitor.perclos.total_time = 5.0                   # menos que el denominador mínimo: no se estima
+        too_early = self.render(FatigueMonitor.FASE_MONITOREO)
+        self.monitor.perclos.value = 2.0
+        also_early = self.render(FatigueMonitor.FASE_MONITOREO)
+        panel = slice(16, 700), slice(880, 1264)
+        np.testing.assert_array_equal(too_early[panel][:200], also_early[panel][:200])   # misma tarjeta de nivel
+
     def test_el_nombre_del_nivel_cabe_en_la_tarjeta(self):
         from PIL import Image, ImageDraw
         draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))

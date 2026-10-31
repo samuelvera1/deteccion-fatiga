@@ -166,8 +166,10 @@ class StartWindow(Window):
             badge.pack_propagate(False)
             label(badge, str(number), 12, True).pack(expand=True)
             label(row, text, 13).pack(side="left", padx=(10, 0))
+        label(steps, "El nivel de fatiga completo aparece tras 1 minuto; los parpadeos y bostezos se cuentan desde el inicio.",
+              11, color=MUTED, wraplength=WIDTH - 2 * MARGIN - 36, justify="left").pack(anchor="w", padx=18, pady=(8, 0))
         keys = ctk.CTkFrame(steps, fg_color="transparent")
-        keys.pack(anchor="w", padx=18, pady=(8, 14))
+        keys.pack(anchor="w", padx=18, pady=(6, 14))
         for text, bold in (("Para terminar pulsa ", False), ("Q", True), (". Para recalibrar pulsa ", False),
                            ("C", True), (".", False)):
             label(keys, text, 12, bold, color=TEXT if bold else MUTED).pack(side="left")

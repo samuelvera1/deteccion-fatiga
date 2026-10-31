@@ -61,6 +61,11 @@ def fit_to_window(frame, size, buffer=None):
     return buffer
 
 
+def _dim(color, amount=0.45):
+    """Color atenuado (hacia gris): un nivel estimado se ve menos firme que uno confirmado."""
+    return tuple(int(c * (1 - amount) + g * amount) for c, g in zip(color, (120, 124, 136)))
+
+
 def _tint(color, amount=0.14):
     """Fondo oscuro con un matiz del color (tarjeta del nivel)."""
     return tuple(int(ui.BG[i] * (1 - amount) + color[i] * amount) for i in range(3))
@@ -248,7 +253,7 @@ class HudRenderer:
             self._panel = np.empty((PANEL_HEIGHT, PANEL_X1 - PANEL_X0, 3), np.uint8)
             self._panel[:] = ui.BG[::-1]
             self._panel_img = Image.new("RGB", (PANEL_X1 - PANEL_X0, PANEL_HEIGHT), ui.BG)
-        keys = {"level": state[1:4] + state[12:14] + state[16:19],
+        keys = {"level": state[1:4] + state[12:14] + state[16:20],
                 "perclos": (state[0], state[3]) + state[4:6] + state[12:15] + state[16:18],
                 "counters": state[6:8] + state[9:11], "info": (state[8], state[11])}
         changed = [part for part, key in keys.items() if self._panel_key.get(part) != key]
@@ -256,6 +261,18 @@ class HudRenderer:
             self._panel_key.update({part: keys[part] for part in changed})
             self._draw_panel(state, changed)
         return self._panel
+
+    @staticmethod
+    def _provisional_level(monitor, phase, reliable, valid_secs, need):
+        """Nivel estimado con el PERCLOS que se lleva mientras la alerta aún no tiene el último minuto casi completo.
+        Solo es una estimación para mostrar: no suena ni cuenta como alerta (eso lo decide fatigue_alert).
+        Con menos datos que el denominador mínimo del PERCLOS no se estima nada."""
+        if (phase != monitor.FASE_MONITOREO or not reliable or valid_secs >= need
+                or valid_secs < monitor.perclos.min_seconds or monitor.alert.level != NORMAL):
+            return None
+        value = monitor.perclos_val
+        return (NORMAL if value < monitor.PERCLOS_WARN_PCT
+                else PRECAUCION if value < monitor.PERCLOS_ALERT_PCT else SOMNOLENCIA)
 
     @staticmethod
     def _panel_state(monitor):
@@ -277,11 +294,12 @@ class HudRenderer:
                 None if glasses is None else bool(glasses),
                 monitor.PERCLOS_WARN_PCT, monitor.PERCLOS_ALERT_PCT, monitor.PERCLOS_BAR_MAX,
                 monitor.LONG_BLINK_SECONDS, int(min(monitor.perclos.total_time, need)), int(need),
-                bool(phase == monitor.FASE_MONITOREO and not monitor.head.eye_valid))
+                bool(phase == monitor.FASE_MONITOREO and not monitor.head.eye_valid),
+                HudRenderer._provisional_level(monitor, phase, reliable, int(min(monitor.perclos.total_time, need)), need))
 
     def _draw_panel(self, state, parts):
         (calibrating, calib, level, unreliable, perclos, gathering, blinks, long_blinks, last_blink,
-         yawns, micro_yawns, glasses, warn, alert, bar_max, long_seconds, valid_secs, need_secs, pose_out) = state
+         yawns, micro_yawns, glasses, warn, alert, bar_max, long_seconds, valid_secs, need_secs, pose_out, provisional) = state
         # la alerta de PERCLOS espera el último minuto casi completo de datos válidos (fatigue_alert): mientras
         # falte, el nivel es NORMAL solo por falta de datos y el panel lo dice, en vez de afirmar un nivel
         incomplete = valid_secs < need_secs
@@ -302,6 +320,10 @@ class HudRenderer:
             elif unreliable and level == NORMAL:
                 color, name = LEVEL_COLORS[PRECAUCION], "OJO CERRADO NO MEDIDO"
                 subtitle = "PERCLOS y alertas no fiables."
+            elif level == NORMAL and incomplete and provisional:
+                color, name = _dim(LEVEL_COLORS[provisional]), LEVEL_NAMES[provisional]
+                subtitle = ("Postura fuera de rango: no se acumulan datos" if pose_out
+                            else f"Estimando con {valid_secs} de {need_secs} s de datos · aún sin alertas")
             elif level == NORMAL and incomplete:
                 color, name = CALIBRATING_COLOR, "REUNIENDO DATOS"
                 subtitle = ("Postura fuera de rango: no se acumulan datos" if pose_out
@@ -313,7 +335,9 @@ class HudRenderer:
                 if unreliable:
                     subtitle = "PERCLOS no fiable (ojo cerrado no medido)"
             card(0, 216, fill=_tint(color), outline=color, line=2)
-            d.text((20, 18), "NIVEL DE FATIGA", font=section, fill=ui.MUTED)
+            d.text((20, 18), "NIVEL DE FATIGA" + ("  ·  PROVISIONAL" if provisional and incomplete and level == NORMAL
+                                                    and not calibrating and not unreliable else ""),
+                   font=section, fill=ui.MUTED)
             d.text((20, 40), name, font=_fit_font(d, name, True, 46, width - 40), fill=color)
             d.text((20, 108), subtitle, font=_fit_font(d, subtitle, False, 15, width - 40), fill=ui.TEXT)
             if unreliable and not calibrating and level == NORMAL:
