@@ -76,6 +76,35 @@ class FatigueAlertTest(unittest.TestCase):
         finally:
             fa.play_alarm = original
 
+    def test_un_sonido_por_estado(self):
+        sounds = []
+        fa.play_alarm, original = (lambda level: sounds.append(level)), fa.play_alarm
+        try:
+            alert = fa.FatigueAlert(60, sound=True)
+            run(alert, [(0.0, 60, False)] * 3)                      # normal desde el inicio: no suena nada
+            self.assertEqual(sounds, [])
+            run(alert, [(9.0, 60, False)] * 5, start=3)             # entra en precaución: suena una sola vez
+            self.assertEqual(sounds, [fa.PRECAUCION])
+            run(alert, [(15.0, 60, False)] * 3, start=8)            # entra en somnolencia
+            self.assertEqual(sounds[-1], fa.SOMNOLENCIA)
+            run(alert, [(15.0, 60, True)] * 2, start=11)            # micro-sueño
+            self.assertEqual(sounds[-1], fa.MICRO_SUENO)
+            sounds.clear()
+            run(alert, [(0.0, 60, False)] * 3, start=13)            # vuelve a normal: un aviso suave
+            self.assertEqual(sounds, [fa.NORMAL])
+        finally:
+            fa.play_alarm = original
+
+    def test_sin_sonido_no_suena_ningun_estado(self):
+        sounds = []
+        fa.play_alarm, original = (lambda level: sounds.append(level)), fa.play_alarm
+        try:
+            alert = fa.FatigueAlert(60, sound=False)
+            run(alert, [(9.0, 60, False)] * 3 + [(15.0, 60, True)] * 3 + [(0.0, 60, False)] * 3)
+            self.assertEqual(sounds, [])
+        finally:
+            fa.play_alarm = original
+
 
 if __name__ == "__main__":
     unittest.main()

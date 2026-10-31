@@ -4,7 +4,8 @@ de advertencia de las alertas de fatiga."""
 import os
 import sys
 
-SOUND_FILES = {"SOMNOLENCIA": "somnolencia.wav", "MICRO_SUENO": "microsueno.wav"}
+SOUND_FILES = {"NORMAL": "normal.wav", "PRECAUCION": "precaucion.wav", "SOMNOLENCIA": "somnolencia.wav",
+               "MICRO_SUENO": "microsueno.wav"}
 
 
 def _sound_path(level):

@@ -248,7 +248,8 @@ class HudRenderer:
             self._panel = np.empty((PANEL_HEIGHT, PANEL_X1 - PANEL_X0, 3), np.uint8)
             self._panel[:] = ui.BG[::-1]
             self._panel_img = Image.new("RGB", (PANEL_X1 - PANEL_X0, PANEL_HEIGHT), ui.BG)
-        keys = {"level": state[1:4] + state[12:14] + state[16:18], "perclos": (state[0], state[3]) + state[4:6] + state[12:15],
+        keys = {"level": state[1:4] + state[12:14] + state[16:19],
+                "perclos": (state[0], state[3]) + state[4:6] + state[12:15] + state[16:18],
                 "counters": state[6:8] + state[9:11], "info": (state[8], state[11])}
         changed = [part for part, key in keys.items() if self._panel_key.get(part) != key]
         if changed:
@@ -275,11 +276,15 @@ class HudRenderer:
                 monitor.yawn.count, monitor.yawn.micro_count,
                 None if glasses is None else bool(glasses),
                 monitor.PERCLOS_WARN_PCT, monitor.PERCLOS_ALERT_PCT, monitor.PERCLOS_BAR_MAX,
-                monitor.LONG_BLINK_SECONDS, int(min(monitor.perclos.total_time, need)), int(need))
+                monitor.LONG_BLINK_SECONDS, int(min(monitor.perclos.total_time, need)), int(need),
+                bool(phase == monitor.FASE_MONITOREO and not monitor.head.eye_valid))
 
     def _draw_panel(self, state, parts):
         (calibrating, calib, level, unreliable, perclos, gathering, blinks, long_blinks, last_blink,
-         yawns, micro_yawns, glasses, warn, alert, bar_max, long_seconds, valid_secs, need_secs) = state
+         yawns, micro_yawns, glasses, warn, alert, bar_max, long_seconds, valid_secs, need_secs, pose_out) = state
+        # la alerta de PERCLOS espera el último minuto casi completo de datos válidos (fatigue_alert): mientras
+        # falte, el nivel es NORMAL solo por falta de datos y el panel lo dice, en vez de afirmar un nivel
+        incomplete = valid_secs < need_secs
         width = PANEL_X1 - PANEL_X0
         img = self._panel_img
         d = ImageDraw.Draw(img)
@@ -297,15 +302,16 @@ class HudRenderer:
             elif unreliable and level == NORMAL:
                 color, name = LEVEL_COLORS[PRECAUCION], "OJO CERRADO NO MEDIDO"
                 subtitle = "PERCLOS y alertas no fiables."
+            elif level == NORMAL and incomplete:
+                color, name = CALIBRATING_COLOR, "REUNIENDO DATOS"
+                subtitle = ("Postura fuera de rango: no se acumulan datos" if pose_out
+                            else f"{valid_secs} de {need_secs} s de datos válidos en el último minuto")
             else:
                 color, name = LEVEL_COLORS[level], LEVEL_NAMES[level]
                 subtitle = {NORMAL: f"PERCLOS por debajo de {warn:.0f} %", PRECAUCION: f"PERCLOS ≥ {warn:.0f} %",
                             SOMNOLENCIA: f"PERCLOS ≥ {alert:.0f} %", MICRO_SUENO: "Ojos cerrados ≥ 1 s"}[level]
                 if unreliable:
                     subtitle = "PERCLOS no fiable (ojo cerrado no medido)"
-                elif level == NORMAL and valid_secs < need_secs:
-                    # la alerta de PERCLOS espera la ventana casi completa: con menos datos no se puede decir "por debajo"
-                    subtitle = f"Reuniendo datos: {valid_secs} de {need_secs} s válidos"
             card(0, 216, fill=_tint(color), outline=color, line=2)
             d.text((20, 18), "NIVEL DE FATIGA", font=section, fill=ui.MUTED)
             d.text((20, 40), name, font=_fit_font(d, name, True, 46, width - 40), fill=color)
@@ -315,7 +321,7 @@ class HudRenderer:
                 kx = 20 + d.textlength("Pulsa ", font=body)
                 kw = self._keycap(d, kx, 137, "C")
                 d.text((kx + kw + 8, 140), "y cierra los ojos hasta oír el pitido", font=body, fill=ui.TEXT)
-            elif not calibrating:
+            elif not calibrating and not (level == NORMAL and incomplete):
                 seg_w = (width - 40 - 3 * 6) / 4
                 for i, lv in enumerate(LEVEL_ORDER):
                     x = 20 + i * (seg_w + 6)
@@ -325,7 +331,7 @@ class HudRenderer:
                     font = _fit_font(d, label, active, 11, seg_w + 4)
                     d.text((x, 172), label, font=font, fill=LEVEL_COLORS[lv] if active else ui.FAINT)
             else:
-                progress = (calib[1] if calib else 0) / 100
+                progress = (calib[1] if calib else 0) / 100 if calibrating else valid_secs / max(need_secs, 1)
                 d.rounded_rectangle((20, 160, width - 20, 168), radius=4, fill=ui.TRACK)
                 if progress > 0:
                     d.rounded_rectangle((20, 160, 20 + max(8, int((width - 40) * progress)), 168), radius=4, fill=color)
@@ -338,9 +344,9 @@ class HudRenderer:
                                           else LEVEL_COLORS[PRECAUCION] if perclos < alert else LEVEL_COLORS[SOMNOLENCIA])
             card(228, 384)
             d.text((20, 252), "PERCLOS · 60 s", font=section, fill=ui.MUTED if not dimmed else DIM)
-            if gathering and not calibrating:
-                d.text((20 + d.textlength("PERCLOS · 60 s   ", font=section), 252), "reuniendo datos", font=ui.load_font(12),
-                       fill=ui.FAINT)
+            if incomplete and not calibrating and not unreliable:
+                d.text((20 + d.textlength("PERCLOS · 60 s   ", font=section), 252),
+                       f"datos incompletos ({valid_secs}/{need_secs} s)", font=ui.load_font(12), fill=ui.FAINT)
             big = ui.load_font(36, True)
             value = f"{perclos:.1f}"
             pct_w = d.textlength(" %", font=ui.load_font(18))

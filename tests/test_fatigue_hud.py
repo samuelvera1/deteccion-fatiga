@@ -95,6 +95,17 @@ class FatigueHudTest(unittest.TestCase):
         complete = self.render(FatigueMonitor.FASE_MONITOREO)
         self.assertFalse(np.array_equal(incomplete, complete))
 
+    def test_reuniendo_datos_explica_si_es_por_la_postura(self):
+        """Con datos incompletos el panel no dice NORMAL: dice que reúne datos, y por qué (postura u otro motivo)."""
+        self.monitor.perclos.total_time = 41.0
+        by_time = self.render(FatigueMonitor.FASE_MONITOREO)
+        self.monitor.head.pose = (0.0, 30.0, 0.0)               # fuera de rango
+        by_pose = self.render(FatigueMonitor.FASE_MONITOREO)
+        self.assertFalse(np.array_equal(by_time, by_pose))
+        self.monitor.perclos.total_time = 60.0
+        self.monitor.head.pose = None
+        self.assertFalse(np.array_equal(by_time, self.render(FatigueMonitor.FASE_MONITOREO)))
+
     def test_el_nombre_del_nivel_cabe_en_la_tarjeta(self):
         from PIL import Image, ImageDraw
         draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))

@@ -42,9 +42,14 @@ USO AVANZADO (desde una consola, en la carpeta del programa; se usa FatigaDetect
   (FatigaDetector.exe no abre consola: es el de uso normal, con ventanas.)
 
 SONIDOS DE ADVERTENCIA
-  Al llegar a SOMNOLENCIA suena una melodía suave y al detectar un MICRO-SUEÑO, una más urgente. Para poner música
-  propia: crea una carpeta "sonidos" junto al .exe y guarda ahí archivos .wav con estos nombres:
-  somnolencia.wav y microsueno.wav (los reemplazan). Para desactivar el sonido: --sin-sonido (en la consola).
+  Cada estado tiene su melodía, y cuanto más grave el estado, más grave y fuerte suena:
+    NORMAL (al volver desde una alerta)  dos notas agudas y suaves que suben.
+    PRECAUCIÓN                           dos notas agudas y suaves que bajan (una vez).
+    SOMNOLENCIA                          tres notas medias en tono menor (se repite cada 30 s).
+    MICRO-SUEÑO                          pulsos graves y ásperos, los más fuertes (se repiten cada 3 s).
+  Para poner música propia: crea una carpeta "sonidos" junto al .exe y guarda ahí archivos .wav con estos nombres:
+  normal.wav, precaucion.wav, somnolencia.wav y microsueno.wav (reemplazan a los incluidos).
+  Para desactivar el sonido: --sin-sonido (en la consola).
 
 NOTAS
   - El primer arranque tarda unos segundos en abrir.

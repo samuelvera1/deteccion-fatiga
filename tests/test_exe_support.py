@@ -40,13 +40,29 @@ class LogWithoutConsoleTest(unittest.TestCase):
 
 
 class AlertSoundTest(unittest.TestCase):
-    def test_las_melodias_incluidas_existen(self):
-        for level in ("SOMNOLENCIA", "MICRO_SUENO"):
-            self.assertTrue(os.path.exists(fatigue_audio._sound_path(level)), level)
+    def test_cada_estado_tiene_su_melodia(self):
+        paths = {level: fatigue_audio._sound_path(level) for level in ("NORMAL", "PRECAUCION", "SOMNOLENCIA", "MICRO_SUENO")}
+        for level, path in paths.items():
+            self.assertTrue(path and os.path.exists(path), level)
+        self.assertEqual(len(set(paths.values())), 4)
 
-    def test_precaucion_no_tiene_sonido(self):
-        self.assertIsNone(fatigue_audio._sound_path("PRECAUCION"))
-        self.assertFalse(fatigue_audio.play_alert("PRECAUCION"))
+    def test_cuanto_mas_grave_el_estado_mas_fuerte_y_mas_grave_suena(self):
+        """El micro-sueño es el más grave y fuerte; el volumen y el tono no suben hacia el estado más leve."""
+        import wave
+
+        import numpy as np
+        peaks, pitches = {}, {}
+        for level in ("NORMAL", "PRECAUCION", "SOMNOLENCIA", "MICRO_SUENO"):
+            with wave.open(fatigue_audio._sound_path(level)) as w:
+                data = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(float)
+                rate = w.getframerate()
+            peaks[level] = np.abs(data).max() / 32767
+            spectrum = np.abs(np.fft.rfft(data))
+            pitches[level] = np.fft.rfftfreq(len(data), 1 / rate)[spectrum.argmax()]
+        order = ["NORMAL", "PRECAUCION", "SOMNOLENCIA", "MICRO_SUENO"]
+        self.assertEqual(sorted(order, key=lambda lv: peaks[lv]), order)
+        self.assertEqual(sorted(order, key=lambda lv: -pitches[lv]), order)
+        self.assertLess(pitches["MICRO_SUENO"], 300)
 
     def test_un_archivo_propio_reemplaza_la_melodia(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -59,6 +75,7 @@ class AlertSoundTest(unittest.TestCase):
                     mock.patch.object(sys, "executable", os.path.join(folder, "FatigaDetector.exe")):
                 self.assertEqual(fatigue_audio._sound_path("SOMNOLENCIA"), own)
                 self.assertTrue(fatigue_audio._sound_path("MICRO_SUENO").endswith("microsueno.wav"))
+                self.assertTrue(fatigue_audio._sound_path("PRECAUCION").endswith("precaucion.wav"))
 
 
 if __name__ == "__main__":

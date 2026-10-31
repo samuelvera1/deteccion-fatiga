@@ -33,7 +33,7 @@ COLORS_BGR = {NORMAL: (0, 200, 110), PRECAUCION: (0, 200, 255), SOMNOLENCIA: (0,
 def play_alarm(level):
     """Melodía de advertencia sin bloquear el análisis; si no hay archivo de sonido, el sonido del sistema."""
     import fatigue_audio
-    if fatigue_audio.play_alert(level):
+    if fatigue_audio.play_alert(level) or level not in (SOMNOLENCIA, MICRO_SUENO):
         return
     try:
         import winsound
@@ -96,6 +96,7 @@ class FatigueAlert:
         level = MICRO_SUENO if microsleep else self.perclos_level
         changed = level != self.level
         rising = LEVELS.index(level) > LEVELS.index(self.level)
+        previous = self.level
         if changed:
             self.level, self.since = level, now
             if rising and level != PRECAUCION:
@@ -105,6 +106,10 @@ class FatigueAlert:
                     self.on_alert(level)
             elif rising:
                 self.alert_counts[level] += 1
+            # un solo aviso al entrar en PRECAUCIÓN y otro al volver a NORMAL desde un nivel de alerta; SOMNOLENCIA
+            # y MICRO-SUEÑO suenan al entrar y se repiten (_maybe_sound)
+            if self.sound and ((level == PRECAUCION and rising) or (level == NORMAL and previous != NORMAL)):
+                play_alarm(level)
         self._maybe_sound(now)
         return level if changed else None
 
