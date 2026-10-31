@@ -71,6 +71,21 @@ class SummaryViewTest(unittest.TestCase):
         self.assertAlmostEqual(sum(lv["share"] for lv in view["levels"]), 1.0)
         self.assertEqual([lv["alerts"] for lv in view["levels"]], ["—", "3", "1", "2"])
 
+    def test_conteo_de_anotaciones(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertEqual(sv.count_annotations(folder), {"blind": 0, "review": 0})
+            with open(os.path.join(folder, "anotaciones_ciego.csv"), "w", encoding="utf-8") as f:
+                f.write("t_s,tipo\n1.0,PARPADEO\n2.0,BOSTEZO\n")
+            with open(os.path.join(folder, "anotaciones_revision.csv"), "w", encoding="utf-8") as f:
+                f.write("t_s,tipo\n")                                  # solo encabezado: ninguna anotación
+            self.assertEqual(sv.count_annotations(folder), {"blind": 2, "review": 0})
+
+    def test_sesion_grabada(self):
+        self.assertFalse(sv.summary_view(make_meta(), True, "sesiones/x")["recorded"])
+        meta = make_meta(grabacion={"archivo": "grabacion.mp4"})
+        self.assertTrue(sv.summary_view(meta, True, "sesiones/x")["recorded"])
+
     def test_sin_nombre_es_anonimo(self):
         view = sv.summary_view(make_meta(sujeto="anonimo", condicion=None), True, "sesiones/x")
         self.assertEqual(view["participant"], "Anónimo")

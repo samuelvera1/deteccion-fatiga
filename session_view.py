@@ -34,6 +34,18 @@ def plural(count, singular, plural_form):
     return f"{count} {singular if count == 1 else plural_form}"
 
 
+def count_annotations(folder):
+    """Anotaciones guardadas de la sesión: {"blind": n (modo ciego), "review": n (revisión)}."""
+    counts = {}
+    for key, name in (("blind", "anotaciones_ciego.csv"), ("review", "anotaciones_revision.csv")):
+        try:
+            with open(os.path.join(folder, name), encoding="utf-8", newline="") as f:
+                counts[key] = max(sum(1 for _ in f) - 1, 0)          # sin la fila de encabezado
+        except OSError:
+            counts[key] = 0
+    return counts
+
+
 def summary_view(meta, reliable, folder):
     """meta: contenido de metadata.json al terminar la sesión. reliable: si el cierre del ojo se midió bien
     (FatigueMonitor.closure_reliable). folder: carpeta donde quedó la sesión."""
@@ -66,6 +78,8 @@ def summary_view(meta, reliable, folder):
         "when": datetime.fromisoformat(meta["inicio"]).strftime("%d/%m/%Y · %H:%M"),
         "duration": clock(summary["duracion_s"]),
         "reliable": bool(reliable),
+        "recorded": bool(meta.get("grabacion")),
+        "annotations": count_annotations(folder),
         "counted": counted,
         "warning": warning,
         "blinks": str(blinks),

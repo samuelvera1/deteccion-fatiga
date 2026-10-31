@@ -57,7 +57,9 @@ PANEL_W = 420                       # panel lateral derecho
 PAD, GAP = 14, 8                    # margen del panel y separación entre tarjetas
 GUTTER = 92                         # columna con los nombres de las filas en la barra de tiempo
 JPEG_QUALITY = 85
-CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache_revisor")
+# Junto al programa; en el ejecutable, junto al .exe (no dentro del paquete interno)
+CACHE_DIR = os.path.join(os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
+                         else os.path.dirname(os.path.abspath(__file__)), "cache_revisor")
 
 # Micro-bostezo (K): bostezo contenido o con poca apertura bucal; el sistema lo separa con umbrales
 # (MICRO_BOSTEZO), el anotador por apreciación visual. M = cierre largo (micro-sueño conductual, >= 1 s).
@@ -1046,6 +1048,16 @@ def parse_args():
     if bool(args.sesion) == bool(args.video):
         parser.error("indica una carpeta de sesión o --video RUTA (uno de los dos)")
     return args
+
+
+def review_session(session_dir, blind, annotator=None):
+    """Abre el editor de anotación sobre una sesión y espera a que se cierre (lo usa main.py desde las ventanas).
+    Devuelve un mensaje de error si no se pudo abrir (sesión sin vídeo...), o None."""
+    try:
+        SessionReviewer(session_dir, blind, annotator).run()
+    except SystemExit as stop:
+        return str(stop.code) if isinstance(stop.code, str) else None
+    return None
 
 
 if __name__ == "__main__":

@@ -65,6 +65,29 @@ class GuiLifecycleTest(unittest.TestCase):
         window = gui.SummaryWindow(view)
         self.assertIsNone(press(window, click(window.close_button)))
 
+    def test_resumen_boton_revisar_el_video(self):
+        window = gui.SummaryWindow(session_view.summary_view(make_meta(), True, "sesiones/x"))
+        self.assertEqual(press(window, click(window.review_button)), "review")
+
+    def test_revision_elegir_modo(self):
+        meta = make_meta()
+        meta["grabacion"] = {"archivo": "grabacion.mp4"}
+        view = session_view.summary_view(meta, True, "sesiones/x")
+        self.assertTrue(view["recorded"])
+        window = gui.ReviewWindow(view)
+        self.assertEqual(press(window, click(window.blind_button)), "blind")
+        window = gui.ReviewWindow(view)
+        self.assertEqual(press(window, click(window.review_button)), "review")
+        window = gui.ReviewWindow(view)
+        self.assertIsNone(press(window, click(window.cancel_button)))
+
+    def test_revision_de_sesion_sin_grabacion_solo_avisa(self):
+        view = session_view.summary_view(make_meta(), True, "sesiones/x")
+        self.assertFalse(view["recorded"])
+        window = gui.ReviewWindow(view)
+        self.assertFalse(hasattr(window, "blind_button"))
+        self.assertIsNone(press(window, click(window.cancel_button)))
+
     def test_aviso_de_camara_reintentar_y_salir(self):
         window = gui.CameraErrorWindow()
         self.assertEqual(press(window, click(window.retry_button)), "retry")

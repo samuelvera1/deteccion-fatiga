@@ -191,7 +191,7 @@ class StartWindow(Window):
 # ---------------------------------------------------------------------- resumen
 
 class SummaryWindow(Window):
-    """Resumen al terminar (datos de session_view.summary_view). Devuelve "new" o None."""
+    """Resumen al terminar (datos de session_view.summary_view). Devuelve "new", "review" o None."""
 
     def __init__(self, view):
         super().__init__("Resumen de la sesión")
@@ -202,8 +202,8 @@ class SummaryWindow(Window):
 
         buttons = ctk.CTkFrame(body, fg_color="transparent")
         buttons.pack(side="bottom", fill="x", pady=(14, 0))
-        self.open_button = button(buttons, "Abrir carpeta", self.open_folder, primary=True)
-        self.open_button.pack(side="left", fill="x", expand=True)
+        self.review_button = button(buttons, "Revisar el video", lambda: self.close("review"), primary=True)
+        self.review_button.pack(side="left", fill="x", expand=True)
         self.new_button = button(buttons, "Nueva sesión", lambda: self.close("new"), width=130)
         self.new_button.pack(side="left", padx=(10, 0))
         self.close_button = button(buttons, "Cerrar", self.close, width=100)
@@ -282,8 +282,14 @@ class SummaryWindow(Window):
         path.pack(fill="x", padx=16, pady=(10, 0))
         label(path, "Guardado en", 12, color=MUTED).pack(side="left")
         label(path, view["build"], 11.5, color=FAINT).pack(side="right")
-        label(info, shorten_path(view["folder"]), 11.5, wraplength=WIDTH - 2 * MARGIN - 32, justify="left").pack(
-            anchor="w", padx=16, pady=(2, 12))
+        where = ctk.CTkFrame(info, fg_color="transparent")
+        where.pack(fill="x", padx=16, pady=(2, 12))
+        label(where, shorten_path(view["folder"], 50), 11, wraplength=WIDTH - 2 * MARGIN - 160, justify="left").pack(
+            side="left")
+        self.open_button = ctk.CTkButton(where, text="Abrir carpeta", command=self.open_folder, width=104, height=28,
+                                         corner_radius=8, font=font(12, True), fg_color=BUTTON, hover_color=BUTTON_HOVER,
+                                         text_color=TEXT, border_width=1, border_color=BUTTON_BORDER)
+        self.open_button.pack(side="right")
 
         self.bind("<Escape>", lambda event: self.close())
 
@@ -292,6 +298,61 @@ class SummaryWindow(Window):
             os.startfile(self.view["folder"])
         except (AttributeError, OSError):
             pass
+
+
+# ---------------------------------------------------------------------- revisar el video
+
+class ReviewWindow(Window):
+    """Elige cómo revisar el video de la sesión. Devuelve "blind", "review" o None (cancelar).
+    view: datos de session_view.summary_view (recorded, annotations)."""
+
+    def __init__(self, view):
+        recorded = view["recorded"]
+        super().__init__("Revisar el video", 480, 430 if recorded else 250)
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=26, pady=(22, 18))
+        label(body, "Revisar el video", 22, True).pack(anchor="w")
+        if not recorded:
+            label(body, "Esta sesión no se grabó, así que no hay video que revisar. La próxima vez activa «Grabar el "
+                        "video de la sesión» en la ventana de inicio.", 13, color=MUTED, wraplength=428,
+                  justify="left").pack(anchor="w", pady=(10, 0))
+            self.cancel_button = button(body, "Entendido", self.close, primary=True)
+            self.cancel_button.pack(side="bottom", fill="x")
+            self.bind("<Return>", lambda event: self.close())
+            self.bind("<Escape>", lambda event: self.close())
+            return
+        label(body, "Marca sobre el video dónde hubo cada evento (parpadeo, bostezo, cierre largo...).", 13,
+              color=MUTED, wraplength=428, justify="left").pack(anchor="w", pady=(4, 0))
+        self.blind_button = self._option(
+            body, "Anotar eventos",
+            "No ves lo que detectó el sistema, así tu anotación no se deja influir. Es la que sirve como "
+            "referencia para medir su precisión.", "blind", True)
+        self.review_button = self._option(
+            body, "Revisar detecciones",
+            "Ves lo que detectó el sistema y marcas dónde se equivocó (por ejemplo: «aquí no hubo bostezo»). "
+            "Sirve para encontrar errores, no como referencia.", "review", False)
+        counts = view["annotations"]
+        if counts["blind"] or counts["review"]:
+            parts = []
+            if counts["blind"]:
+                parts.append(f"{counts['blind']} anotadas en modo ciego")
+            if counts["review"]:
+                parts.append(f"{counts['review']} de revisión")
+            label(body, "Ya guardadas: " + " · ".join(parts), 12, color=MUTED).pack(anchor="w", pady=(12, 0))
+        self.cancel_button = button(body, "Cancelar", self.close)
+        self.cancel_button.pack(side="bottom", fill="x")
+        self.bind("<Escape>", lambda event: self.close())
+
+    def _option(self, master, title, description, result, primary):
+        frame = card(master)
+        frame.pack(fill="x", pady=(12, 0))
+        label(frame, title, 14, True).pack(anchor="w", padx=16, pady=(12, 0))
+        label(frame, description, 12, color=MUTED, wraplength=400, justify="left").pack(anchor="w", padx=16,
+                                                                                       pady=(2, 8))
+        chosen = button(frame, title, lambda: self.close(result), primary=primary)
+        chosen.configure(height=36)
+        chosen.pack(fill="x", padx=16, pady=(0, 14))
+        return chosen
 
 
 # ---------------------------------------------------------------------- cámara
@@ -335,6 +396,10 @@ def ask_start():
 
 def show_summary(view):
     return SummaryWindow(view).run()
+
+
+def ask_review(view):
+    return ReviewWindow(view).run()
 
 
 def camera_error():

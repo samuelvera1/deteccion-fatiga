@@ -208,8 +208,18 @@ def run_with_windows():
                 return
         monitor = run_session(parse_args(options_to_argv(choice)))
         print_summary(monitor)
-        view = session_view.summary_view(monitor.session.metadata, monitor.closure_reliable, monitor.session.dir)
-        if gui.show_summary(view) != "new":
+        while True:
+            view = session_view.summary_view(monitor.session.metadata, monitor.closure_reliable, monitor.session.dir)
+            action = gui.show_summary(view)
+            if action != "review":
+                break
+            mode = gui.ask_review(view)
+            if mode:
+                import revisar
+                problem = revisar.review_session(monitor.session.dir, blind=(mode == "blind"))
+                if problem:
+                    gui.show_error(problem)
+        if action != "new":
             return
 
 
