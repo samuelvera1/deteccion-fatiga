@@ -10,6 +10,7 @@ entrega, compila con el árbol limpio (sin cambios sin commit)."""
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -77,6 +78,9 @@ def main():
         os.remove(os.path.join(ROOT, "build_info.json"))
     folder = os.path.join(ROOT, "dist", NAME)
     write_readme(folder, info)
+    # el editor de anotación remite a esta guía (definiciones de cada evento)
+    os.makedirs(os.path.join(folder, "docs"), exist_ok=True)
+    shutil.copy(os.path.join(ROOT, "docs", "guia_anotacion.md"), os.path.join(folder, "docs", "guia_anotacion.md"))
     size = sum(os.path.getsize(os.path.join(b, f)) for b, _, fs in os.walk(folder) for f in fs) / 1e6
     print(f"\nEjecutable: {os.path.join(folder, NAME + '.exe')}  ({size:.0f} MB)")
     if not args.sin_zip:

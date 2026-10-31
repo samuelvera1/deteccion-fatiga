@@ -18,11 +18,20 @@ CÓMO USARLO
   5. Teclas:  C = recalibrar (cierra los ojos hasta oír el pitido)    Q = terminar la sesión
               Espacio = pausa (solo al analizar un vídeo)
   Al terminar se abre una ventana con el resumen de la sesión (parpadeos, bostezos, PERCLOS y tiempo en cada nivel),
-  con un botón para abrir la carpeta donde se guardó y otro para empezar una sesión nueva.
+  con un botón para revisar el video, otro para empezar una sesión nueva y, junto a la ruta, "Abrir carpeta".
+
+REVISAR EL VIDEO (solo si activaste "Grabar el video de la sesión")
+  En el resumen, "Revisar el video" ofrece dos modos:
+    Anotar eventos: marcas dónde hubo parpadeos, bostezos y cierres largos SIN ver lo que detectó el sistema.
+      Es la anotación que sirve como referencia para medir su precisión (definiciones en docs\guia_anotacion.md).
+    Revisar detecciones: ves lo que detectó el sistema y marcas dónde se equivocó. Sirve para encontrar errores.
+  En el editor: la tecla al inicio y otra vez al final de cada evento (B parpadeo, Y bostezo, K micro-bostezo,
+  M cierre largo, X no evaluable), Espacio reproduce, A/D avanzan un frame, U deshace, Q guarda y sale.
 
 DÓNDE QUEDAN LOS DATOS
   En la carpeta "sesiones" junto al .exe: una carpeta por sesión con
-    metadata.json (versión, commit, parámetros, FPS), eventos.csv, traza.csv y, si grabaste, grabacion.mp4.
+    metadata.json (versión, commit, parámetros, FPS), eventos.csv, traza.csv y, si grabaste, grabacion.mp4
+    (y las anotaciones, si las haces). La carpeta "cache_revisor" es una caché del editor y se puede borrar.
   participantes_privado.csv (junto al .exe) liga cada nombre con un código anónimo (S01...): no lo compartas.
 
 USO AVANZADO (desde una consola, en la carpeta del programa)
