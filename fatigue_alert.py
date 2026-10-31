@@ -31,7 +31,10 @@ COLORS_BGR = {NORMAL: (0, 200, 110), PRECAUCION: (0, 200, 255), SOMNOLENCIA: (0,
 
 
 def play_alarm(level):
-    """Sonido sin bloquear el análisis (winsound.Beep congelaría el bucle mientras suena)."""
+    """Melodía de advertencia sin bloquear el análisis; si no hay archivo de sonido, el sonido del sistema."""
+    import fatigue_audio
+    if fatigue_audio.play_alert(level):
+        return
     try:
         import winsound
         alias = "SystemHand" if level == MICRO_SUENO else "SystemExclamation"

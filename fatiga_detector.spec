@@ -10,7 +10,7 @@ for package in ("mediapipe", "customtkinter"):
     datas += package_datas
     binaries += package_binaries
     hiddenimports += package_imports
-datas += [("build_info.json", "."), ("assets/fatiga.ico", "assets")]
+datas += [("build_info.json", "."), ("assets/fatiga.ico", "assets"), ("assets/sounds", "assets/sounds")]
 
 analysis = Analysis(
     ["main.py"],
@@ -24,14 +24,9 @@ analysis = Analysis(
     noarchive=False,
 )
 pyz = PYZ(analysis.pure)
-exe = EXE(
-    pyz,
-    analysis.scripts,
-    [],
-    exclude_binaries=True,
-    name="FatigaDetector",
-    console=True,            # por ahora la consola sigue visible (avisos y errores); las ventanas son las de gui.py
-    icon="assets/fatiga.ico",
-    upx=False,
-)
-coll = COLLECT(exe, analysis.binaries, analysis.datas, upx=False, name="FatigaDetector")
+# Dos ejecutables que comparten todo lo demás: el normal no abre la pantalla negra (consola) y escribe lo que
+# imprimía en fatiga_detector.log; el de consola sirve para usar el programa desde una terminal (--help, --fuente...)
+exes = [EXE(pyz, analysis.scripts, [], exclude_binaries=True, name=name, console=console, icon="assets/fatiga.ico",
+            upx=False)
+        for name, console in (("FatigaDetector", False), ("FatigaDetector-consola", True))]
+coll = COLLECT(*exes, analysis.binaries, analysis.datas, upx=False, name="FatigaDetector")

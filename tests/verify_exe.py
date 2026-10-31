@@ -2,7 +2,7 @@
 """Comprueba que el ejecutable da EXACTAMENTE los mismos resultados que el código fuente: analiza un vídeo de la
 referencia de golden_master con el .exe y compara resumen, traza.csv, eventos.csv y parámetros con tests/golden_master.json.
 
-    python tests/verify_exe.py                      # usa dist/FatigaDetector/FatigaDetector.exe
+    python tests/verify_exe.py                      # usa dist/FatigaDetector/FatigaDetector-consola.exe
     python tests/verify_exe.py RUTA\FatigaDetector.exe
 
 Hacerlo con cada ejecutable que se entregue. Las sesiones de prueba se borran al terminar."""
@@ -20,7 +20,7 @@ import golden_master as gm  # noqa: E402
 
 
 def main():
-    exe = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "FatigaDetector", "FatigaDetector.exe")
+    exe = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "FatigaDetector", "FatigaDetector-consola.exe")
     if not os.path.exists(exe):
         sys.exit(f"No existe {exe} (compílalo con: python build.py)")
     video = gm.VIDEOS[0]

@@ -45,7 +45,7 @@ def write_readme(folder, info):
 
 
 # Datos de participantes que nunca deben viajar dentro de la entrega, aunque alguien haya probado el .exe en la carpeta
-PRIVATE = ("sesiones", "participantes_privado.csv")
+PRIVATE = ("sesiones", "participantes_privado.csv", "fatiga_detector.log", "cache_revisor", "sonidos")
 
 
 def make_zip(folder, info):
