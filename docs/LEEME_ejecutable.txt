@@ -7,9 +7,12 @@ REQUISITOS
   - No hace falta instalar Python ni nada más.
 
 CÓMO USARLO
-  1. Descomprime la carpeta completa (no muevas FatigaDetector.exe fuera de ella).
-  2. Haz doble clic en FatigaDetector.exe. Se abre una ventana de inicio: escribe tu nombre (es opcional), elige
-     si llevas gafas, decide si quieres grabar el vídeo y pulsa "Empezar".
+  1. Instalación (si recibiste "FatigaDetector-Setup-....exe"): haz doble clic, pulsa "Siguiente" y "Instalar". No pide
+     permisos de administrador. Queda un icono "Fatiga Detector" en el escritorio y en el menú Inicio.
+     (Si recibiste la versión portátil, el .zip: descomprímelo completo y no muevas FatigaDetector.exe fuera de la
+     carpeta.)
+  2. Abre "Fatiga Detector". Se abre una ventana de inicio: escribe tu nombre (es opcional), elige si llevas gafas,
+     decide si quieres grabar el vídeo y pulsa "Empezar".
   3. Calibración (los primeros segundos, con la guía en pantalla):
        Paso 1: mira al frente, con los ojos abiertos y sin moverte.
        Paso 2: cierra los ojos hasta oír el pitido, y ábrelos.
@@ -29,10 +32,11 @@ REVISAR EL VIDEO (solo si activaste "Grabar el video de la sesión")
   M cierre largo, X no evaluable), Espacio reproduce, A/D avanzan un frame, U deshace, Q guarda y sale.
 
 DÓNDE QUEDAN LOS DATOS
-  En la carpeta "sesiones" junto al .exe: una carpeta por sesión con
+  Instalado: en Documentos\Fatiga Detector (no se borra al actualizar ni al desinstalar).
+  Portátil (.zip): junto al .exe. En los dos casos hay una carpeta "sesiones" con una carpeta por sesión con
     metadata.json (versión, commit, parámetros, FPS), eventos.csv, traza.csv y, si grabaste, grabacion.mp4
     (y las anotaciones, si las haces). La carpeta "cache_revisor" es una caché del editor y se puede borrar.
-  participantes_privado.csv (junto al .exe) liga cada nombre con un código anónimo (S01...): no lo compartas.
+  participantes_privado.csv (en esa misma carpeta) liga cada nombre con un código anónimo (S01...): no lo compartas.
 
 USO AVANZADO (desde una consola, en la carpeta del programa; se usa FatigaDetector-consola.exe)
   FatigaDetector-consola.exe --nombre "Nombre Apellido" --condicion con_gafas --grabar
@@ -47,13 +51,13 @@ SONIDOS DE ADVERTENCIA
     PRECAUCIÓN                           dos notas agudas y suaves que bajan (una vez).
     SOMNOLENCIA                          tres notas medias en tono menor (se repite cada 30 s).
     MICRO-SUEÑO                          pulsos graves y ásperos, los más fuertes (se repiten cada 3 s).
-  Para poner música propia: crea una carpeta "sonidos" junto al .exe y guarda ahí archivos .wav con estos nombres:
+  Para poner música propia: crea una carpeta "sonidos" en la carpeta de datos (arriba) y guarda ahí archivos .wav con estos nombres:
   normal.wav, precaucion.wav, somnolencia.wav y microsueno.wav (reemplazan a los incluidos).
   Para desactivar el sonido: --sin-sonido (en la consola).
 
 NOTAS
   - El primer arranque tarda unos segundos en abrir.
-  - Los avisos y los errores del programa se guardan en fatiga_detector.log (junto al .exe). Si algo falla,
+  - Los avisos y los errores del programa se guardan en fatiga_detector.log (en la carpeta de datos). Si algo falla,
     compártelo con el autor; contiene nombres, así que no lo publiques.
   - Si no encuentra la cámara, te lo dice y puedes reintentar (revisa que ningún otro programa la esté usando).
   - Algunos antivirus desconfían de los programas empaquetados que no están firmados. Si lo bloquea, permite

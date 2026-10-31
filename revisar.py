@@ -49,6 +49,7 @@ import cv2
 import numpy as np
 
 import calibration_marks
+import paths
 import revisar_ui as ui
 
 WINDOW = "Revision de video"
@@ -57,9 +58,8 @@ PANEL_W = 420                       # panel lateral derecho
 PAD, GAP = 14, 8                    # margen del panel y separación entre tarjetas
 GUTTER = 92                         # columna con los nombres de las filas en la barra de tiempo
 JPEG_QUALITY = 85
-# Junto al programa; en el ejecutable, junto al .exe (no dentro del paquete interno)
-CACHE_DIR = os.path.join(os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
-                         else os.path.dirname(os.path.abspath(__file__)), "cache_revisor")
+# En la carpeta de datos del programa (paths.py)
+CACHE_DIR = os.path.join(paths.data_dir(), "cache_revisor")
 
 # Micro-bostezo (K): bostezo contenido o con poca apertura bucal; el sistema lo separa con umbrales
 # (MICRO_BOSTEZO), el anotador por apreciación visual. M = cierre largo (micro-sueño conductual, >= 1 s).

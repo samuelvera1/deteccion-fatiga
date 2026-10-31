@@ -32,6 +32,7 @@ import traceback
 import cv2
 
 import calibration_marks
+import paths
 import version
 from fatigue_framework import FatigueMonitor
 from session_recorder import ParticipantRegistry
@@ -233,20 +234,19 @@ def main(argv=None):
 
 def redirect_output_to_log():
     """Sin consola (ejecutable de ventanas) no hay dónde imprimir: avisos, resumen y errores van a
-    fatiga_detector.log junto al .exe."""
+    fatiga_detector.log en la carpeta de datos."""
     if sys.stdout is not None and sys.stderr is not None:
         return
-    log = open(os.path.join(os.path.dirname(sys.executable), "fatiga_detector.log"), "a", encoding="utf-8",
-               buffering=1)
+    log = open(os.path.join(paths.data_dir(), "fatiga_detector.log"), "a", encoding="utf-8", buffering=1)
     log.write(f"\n=== {datetime.datetime.now():%Y-%m-%d %H:%M:%S} · Fatiga Detector {version.VERSION} ===\n")
     sys.stdout = sys.stderr = log
 
 
 def run_executable():
-    """Ejecutable (PyInstaller): trabaja junto al .exe, así sesiones/ y participantes_privado.csv quedan en la
-    misma carpeta aunque se abra con doble clic. Sin argumentos (doble clic) abre las ventanas; con argumentos
-    se comporta como main.py en la consola."""
-    os.chdir(os.path.dirname(sys.executable))
+    """Ejecutable (PyInstaller): trabaja en la carpeta de datos (paths.data_dir), así sesiones/ y
+    participantes_privado.csv quedan siempre en el mismo sitio aunque se abra con doble clic. Sin argumentos
+    (doble clic) abre las ventanas; con argumentos se comporta como main.py en la consola."""
+    os.chdir(paths.data_dir())
     redirect_output_to_log()
     windows = len(sys.argv) == 1
     try:

@@ -14,9 +14,9 @@ def _sound_path(level):
     name = SOUND_FILES.get(level)
     if not name:
         return None
-    here = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
-    bundled = os.path.join(getattr(sys, "_MEIPASS", here), "assets", "sounds", name)
-    for path in (os.path.join(here, "sonidos", name), bundled):
+    import paths
+    bundled = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))), "assets", "sounds", name)
+    for path in (os.path.join(paths.data_dir(), "sonidos", name), bundled):
         if os.path.exists(path):
             return path
     return None
