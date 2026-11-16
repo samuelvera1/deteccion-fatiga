@@ -176,3 +176,26 @@ somnoliento (10) que en el alerta (0) de la misma persona. La duración la mide 
   de conteo con postura válida; se informa cuántos.
 - Exploratorio (no decide): frecuencia de parpadeo por minuto, proporción de parpadeos de 0,5 s o más, el video
   intermedio (5) y PERCLOS (calculado con el ojo cerrado de reserva, marcado como no fiable).
+
+---
+
+## E5 — Contar parpadeos también con la postura fuera de rango (2026-11-16)
+
+**Motivación.** En Eyeblink8, 52 de los 62 parpadeos perdidos (84 %) ocurrieron con la postura fuera de rango, donde
+hoy no se cuentan. E1 mostró que el cierre aparente por postura no se reproduce entre sesiones.
+
+**Hipótesis.** El detector de parpadeos compara con la apertura de hace 0,3-0,9 s (referencia local), así que un
+cambio lento de postura no lo dispara. Contar parpadeos también fuera de rango recupera parpadeos perdidos sin
+añadir muchos falsos positivos. PERCLOS mantiene la exclusión (un cierre aparente sí lo falsearía).
+
+**Cambio probado.** En EyeEventDetector.update, con la postura fuera de rango se sigue ejecutando el detector de
+parpadeos; PERCLOS se sigue saltando (skip_gap). El micro-sueño no cambia. Código: el del commit de este registro
+más ese cambio, en una copia fuera del repositorio (para no alterar E4, que se estaba procesando).
+
+**Datos.** Eyeblink8 (desarrollo, 8 videos) y la sesión piloto propia con anotación ciega (20261009_101139, con
+gafas), comparando contra la versión actual (profundidad mínima D = 0,30).
+
+**Criterio (fijado antes de ejecutar).**
+- Regla del proyecto aplicada a un cambio que busca reducir FN: se acepta si, en Eyeblink8, los FN bajan y los FP
+  no suben.
+- Se informan también el F1 y el resultado de la sesión piloto, que no deciden.
