@@ -361,3 +361,43 @@ vertical (mediana de la sesión) y se suaviza por ojo con la misma media móvil 
 **Decisión.** NO SE ADOPTA (no cumple C1). Hipótesis nueva, posterior a ver estos datos (E7b): usar la señal del iris
 solo para detectar parpadeos, manteniendo la de la IPD para el grado de cierre. Debe probarse en datos no vistos
 (DROZY u otro conjunto), no en estos.
+
+---
+
+## E8 — Estado «ojo cerrado» de PERCLOS contra la anotación cuadro a cuadro de Eyeblink8 (criterio fijado el 2026-11-16, antes de calcular)
+
+**Motivación.** PERCLOS no se había validado: DROZY no se pudo descargar. Eyeblink8 marca, en cada cuadro y para cada
+ojo, si está totalmente cerrado (columnas LE_FC y RE_FC, valor «C»). Es una referencia humana del mismo estado que
+cuenta PERCLOS, aunque en personas alertas (solo parpadeos).
+
+**Hipótesis.** El estado por cuadro que suma PERCLOS (grado de cierre ≥ 0,80) coincide con la anotación humana:
+detecta los cuadros con los dos ojos totalmente cerrados y no marca cuadros con el ojo abierto. En consecuencia, el
+PERCLOS por minuto del sistema queda entre el de los cuadros totalmente cerrados y el de todos los cuadros de parpadeo.
+
+**Datos.** Las 8 sesiones de Eyeblink8 ya procesadas (traza por cuadro, versión 1.0.0 con E2; la apertura y el ojo
+abierto de la calibración no cambian con E5 ni con C1). Cuadros de la fase de monitoreo con postura válida (los que
+cuenta PERCLOS), anotados y con los dos ojos visibles. Sin volver a pasar MediaPipe.
+
+**Nivel de ojo cerrado.** Eyeblink8 no tiene el paso de cerrar los ojos de la calibración, así que se fija así:
+- Principal (decide): validación dejando un video fuera. Proporción ojo cerrado / ojo abierto = mediana, en los otros 7
+  videos, de (mediana de la apertura en sus cuadros con los dos ojos cerrados) / (ojo abierto de su calibración). Se
+  aplica al ojo abierto de la calibración del video apartado. No usa la anotación del video que se evalúa.
+- Secundario (no decide): valor de reserva del sistema, 0,25 × ojo abierto.
+- Techo (no decide, circular): la misma proporción medida en el propio video.
+
+**Referencia por cuadro.** Positivo: los dos ojos «C». Negativo: fuera de todo parpadeo anotado y a más de 2 cuadros de
+uno. Intermedio (no entra en sensibilidad ni en falsos positivos): cuadros de parpadeo sin los dos ojos «C» y los 2
+cuadros alrededor de cada parpadeo, porque un cierre ≥ 80 % sin llegar al 100 % es correcto o no según el párpado.
+
+**Criterio (con el nivel principal).**
+- C1: sensibilidad (positivos con cierre ≥ 0,80) ≥ 0,80, sumando los 8 videos.
+- C2: falsos positivos (negativos con cierre ≥ 0,80) ≤ 1 %, sumando los 8 videos.
+- C3: ventanas de 60 s sin solapamiento desde el inicio del monitoreo, con ≥ 54 s de cuadros evaluables (la misma
+  exigencia que la alerta): el PERCLOS del sistema queda dentro de [PERCLOS de los cuadros totalmente cerrados − 1 punto,
+  PERCLOS de todos los cuadros de parpadeo + 1 punto] en al menos el 90 % de las ventanas.
+- Se considera validado el estado por cuadro si cumple C1, C2 y C3. Se informan además el sesgo y los límites de
+  acuerdo de Bland-Altman del PERCLOS por ventana frente a la referencia de ojos totalmente cerrados, y (solo como
+  diagnóstico) la sensibilidad con desfases de −3 a +3 cuadros.
+
+**Alcance.** Valida la medida de cierre por cuadro y su suma en personas alertas (PERCLOS bajos, del orden de pocos
+puntos). No valida el PERCLOS con somnolencia real (cierres lentos, párpado caído) ni los umbrales de 8 % y 12 %.
