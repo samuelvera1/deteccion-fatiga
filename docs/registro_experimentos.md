@@ -230,7 +230,25 @@ teléfono.
   da p < 0,05 con al menos 15 personas válidas. Se informan también la prueba de los signos, la mediana de las
   diferencias y su intervalo de confianza del 95 % (bootstrap por persona).
 - **Exploratorio.** Frecuencia de parpadeo, proporción de parpadeos de ≥ 0,5 s y PERCLOS (no fiable sin ojo cerrado
-  medido). Con E5 (parpadeos también fuera de rango, adoptado después), una repetición con más partes de UTA-RLDD
+  medido).
+- **Resultado parcial (2026-11-16).** Procesadas Fold1_part1 (6 personas, las mismas del piloto E4) y Fold3_part2
+  (6 personas nuevas). Todos los videos superan la calidad: rostro en el 100 % de los cuadros y 6,8-14,6 minutos de
+  conteo. Se excluye 1 persona (Fold3_part2/32), a la que le falta el video somnoliento. Quedan **11 personas válidas**.
+  - Diferencia de la mediana de duración (somnoliento − alerta), por persona: +34, +67, +133, +160, +33, −32, +80, +83,
+    −27, +33 y +68 ms.
+  - Mediana +67 ms (IC 95 % bootstrap +33 a +83 ms). Positivas 9 de 11 (signos p = 0,033); Wilcoxon unilateral
+    W+ = 63, p = 0,002.
+  - Exploratorio: 16,1 y 17,3 parpadeos/min (alerta y somnoliento); proporción de parpadeos ≥ 0,5 s 5,3 % y 14,7 %.
+  - **Criterio: no evaluable todavía** (11 personas; se exigen 15).
+  - Cautelas:
+    - 6 de las 11 personas son las del piloto, que ya se vieron antes de formular E4b. Solo con las 5 nuevas: 4 de 5
+      positivas, Wilcoxon p = 0,063 (con 5 personas el menor p posible es 0,031).
+    - Tres videos alerta tienen frecuencias raras de parpadeo: Fold3_part2/31 con 53 por minuto (¿falsos positivos?) y
+      Fold3_part2/33 y /34 con unos 2 por minuto (¿parpadeos perdidos?). Sus medianas salen de 20-23 parpadeos en
+      los dos últimos. No se excluyen: el criterio de calidad estaba fijado y no los cubre. Conviene revisarlos a
+      mano (sin cambiar el criterio).
+  - Siguiente paso: Fold1_part2 y Fold3_part1 (u otras partes) para llegar a 15 o más personas, con el mismo
+    análisis. Con E5 (parpadeos también fuera de rango, adoptado después), una repetición con más partes de UTA-RLDD
 debería usar como criterio de calidad el tiempo de conteo con rostro, no el de postura válida, y fijarse antes de
 procesar.
 
