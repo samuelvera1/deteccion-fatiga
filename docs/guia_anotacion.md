@@ -1,8 +1,11 @@
 # Guía de anotación y plan de evaluación
 
-**Versión 1 — 2026-10-09 (borrador).** Si cambia alguna definición, la guía pasa a una versión nueva y se
-registra en el historial de git. Las anotaciones hechas con una versión anterior solo se comparan con las
-nuevas si la definición del evento no cambió.
+**Versión 2 — 2026-11-16.** Añade O (ojo cerrado) para validar PERCLOS (secciones 3, 4 y 5). Las definiciones
+de B, M, Y, K y X no cambian respecto a la versión 1 (2026-10-09, borrador).
+
+Si cambia alguna definición, la guía pasa a una versión nueva y se registra en el historial de git. Las
+anotaciones hechas con una versión anterior solo se comparan con las nuevas si la definición del evento no
+cambió.
 
 Esta guía fija **antes de ver resultados** qué cuenta como cada evento, cómo se anota y cómo se compara
 con el sistema. Las decisiones marcadas como *borrador* están pendientes de confirmar con el director.
@@ -65,6 +68,20 @@ modos. **Solo `anotaciones_ciego.csv` cuenta como referencia.**
 - En los videos de desarrollo estos cierres son **voluntarios**: sirven para evaluar la detección de cierres de
   1 s o más, pero no son micro-sueños reales (confirmarlos requiere EEG).
 
+### O — Ojo cerrado (referencia de PERCLOS)
+- **Qué es:** los **dos** ojos con la pupila totalmente tapada por el párpado. PERCLOS (P80) suma el tiempo con
+  el párpado tapando al menos el 80 % de la pupila (Wierwille et al., 1994); a ojo no se puede decidir el 80 %,
+  así que se anota el 100 %, que se ve sin dudas. Los cuadros entre el 80 % y el 100 % quedan dentro del
+  parpadeo y la evaluación no los cuenta ni a favor ni en contra (sección 4).
+- **Cuándo:** en una **segunda pasada**, con B y M ya anotados. Recorre cada parpadeo y cada cierre largo
+  cuadro a cuadro (A / D) y marca dentro de él el tramo O. Así no se cruza con el B o el M abierto.
+- **Inicio:** primer cuadro en que no se ve la pupila en ninguno de los dos ojos.
+- **Fin:** primer cuadro en que se vuelve a ver la pupila en alguno de los dos. El fin **no** es el último
+  cuadro cerrado: si el ojo está cerrado un solo cuadro, el O va de ese cuadro al siguiente.
+- **No se anota:** parpadeos en que la pupila no llega a taparse del todo (incompletos); ojos entrecerrados con
+  la pupila visible; un solo ojo cerrado.
+- Todo O va dentro de un B o un M. Si no hay B ni M, no hay O; `evaluar.py` avisa de los que quedan fuera.
+
 ### Y — Bostezo · K — Micro-bostezo
 - **Qué es:** apertura involuntaria de la boca con inspiración profunda, una pausa en la máxima apertura y un
   cierre más rápido (Provine, 1986). Suele venir con ojos entrecerrados y, a veces, la cabeza hacia atrás o
@@ -120,8 +137,15 @@ modos. **Solo `anotaciones_ciego.csv` cuenta como referencia.**
   sonrisa se comparan con la referencia. Así se estima cuántos eran eventos reales (pérdidas) y cuántos no
   (aciertos de la regla).
 - **Tipo de bostezo:** acuerdo bostezo/micro-bostezo entre sistema y referencia en los pares emparejados.
-- **PERCLOS:** no se valida con estas anotaciones. Haría falta anotar frame a frame cuándo el ojo está cerrado
-  al menos al 80 %, y queda como tarea aparte.
+- **PERCLOS** (solo si la referencia tiene tramos O). Se usan los cuadros que cuenta PERCLOS: dentro del conteo,
+  con postura válida y fuera de los tramos X. Mismo diseño que E8 (`docs/registro_experimentos.md`).
+  - Clases por cuadro: **positivo**, dentro de un O; **negativo**, a más de 2 cuadros de todo B, M u O (ojo
+    abierto); **intermedio**, el resto de cada parpadeo o cierre, donde un cierre de 80-99 % puede contar o no.
+  - Métricas por cuadro: sensibilidad (positivos con cierre ≥ 0,80) y tasa de falsos positivos (negativos con
+    cierre ≥ 0,80), con intervalos de Wilson.
+  - Por ventana fija de 60 s con al menos 54 s válidos (la exigencia de la alerta): el PERCLOS del sistema debería
+    quedar entre el PERCLOS de los O − 1 punto y el de todos los B, M y O + 1 punto. Se informan cuántas ventanas
+    cumplen y el sesgo y los límites de acuerdo de Bland-Altman del sistema frente a los O.
 
 ## 5. Acuerdo entre anotadores
 
@@ -130,6 +154,7 @@ modos. **Solo `anotaciones_ciego.csv` cuenta como referencia.**
 - Al menos 2 de los videos.
 - `python evaluar.py "sesiones\<sesión>" --acuerdo "Nombre"` calcula la kappa de Cohen (1960) frame a
   frame y el F1 por evento entre los dos anotadores. La kappa se interpreta con Landis y Koch (1977).
+- El ojo cerrado (O) se compara solo con la kappa por cuadro.
 
 ## 6. Videos de desarrollo y de prueba
 
@@ -170,5 +195,8 @@ Acordado el 2026-10-09:
   *Biometrics, 33*(1), 159–174.
 - Provine, R. R. (1986). Yawning as a stereotyped action pattern and releasing stimulus. *Ethology, 72*(2),
   109–122.
+- Wierwille, W. W., Ellsworth, L. A., Wreggit, S. S., Fairbanks, R. J., y Kirn, C. L. (1994). *Research on
+  vehicle-based driver status/performance monitoring: Development, validation, and refinement of algorithms for
+  detection of driver drowsiness* (DOT HS 808 247). National Highway Traffic Safety Administration.
 - Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. *Journal of the
   American Statistical Association, 22*(158), 209–212.

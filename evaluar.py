@@ -14,6 +14,9 @@ Uso:
 En cada sesión escribe evaluacion_<referencia>.json (métricas) y evaluacion_<referencia>_eventos.csv: cada
 evento con su resultado y datos para el análisis de errores (cierre máximo, giro de cabeza, tiempo desde
 que la postura volvió a ser válida...).
+
+Si la referencia tiene tramos O (ojo cerrado), también compara el estado por cuadro que suma PERCLOS y el PERCLOS
+por ventana de 60 s (clave "perclos" del JSON; guía, sección 4).
 """
 import argparse
 import bisect
@@ -39,6 +42,11 @@ REFERENCE_TYPES = {"PARPADEO": "parpadeo", "BOSTEZO": "bostezo", "MICRO_BOSTEZO"
 TOLERANCE_S = {"parpadeo": 0.10, "bostezo": 0.0, "cierre_largo": 0.0}   # guía, sección 4 (borrador)
 Z95 = 1.959964
 MAX_TRACE_GAP_S = 0.2       # un hueco mayor en la traza (sin rostro) corta un tramo de ojo cerrado
+# PERCLOS frente a los tramos O (ojo cerrado): mismo diseño que E8 (docs/registro_experimentos.md)
+P80_CLOSURE = 0.80              # si la sesión no guarda el parámetro (perclos.cierre_min)
+PERCLOS_MARGIN_FRAMES = 2       # cuadros junto a cada parpadeo anotado que no cuentan como ojo abierto
+PERCLOS_WINDOW_S = 60.0
+PERCLOS_MIN_VALID_S = 54.0      # la misma exigencia que la alerta (fatigue_alert: 90 % de la ventana)
 DEFAULT_REFERENCE = "anotaciones_ciego.csv"
 EVENT_COLUMNS = ["clase", "origen", "tipo", "inicio_s", "fin_s", "duracion_s", "resultado",
                  "resultado_postura_valida", "pareja", "motivo_exclusion", "cierre_max", "boca_max",
@@ -101,20 +109,33 @@ def metrics(tp, fp, fn):
             "f1": round(2 * tp / (2 * tp + fp + fn), 4) if tp + fp + fn else None}
 
 
-def bland_altman(pairs):
+def bland_altman(pairs, unit="s"):
     """Acuerdo de duraciones (Bland y Altman, 1986): sesgo = media de (sistema - referencia) y límites de
-    acuerdo = sesgo ± 1.96 DE. pairs: [(duración sistema, duración referencia), ...]."""
+    acuerdo = sesgo ± 1.96 DE. pairs: [(valor sistema, valor referencia), ...]; unit: sufijo de las claves."""
     result = {"n": len(pairs)}
     if len(pairs) < 2:
         return result
     diffs = [s - r for s, r in pairs]
     bias = sum(diffs) / len(diffs)
     sd = math.sqrt(sum((d - bias) ** 2 for d in diffs) / (len(diffs) - 1))
-    result.update({"sesgo_s": round(bias, 4), "de_s": round(sd, 4),
-                   "limites_acuerdo_s": [round(bias - 1.96 * sd, 4), round(bias + 1.96 * sd, 4)],
-                   "media_sistema_s": round(sum(s for s, _ in pairs) / len(pairs), 4),
-                   "media_referencia_s": round(sum(r for _, r in pairs) / len(pairs), 4)})
+    result.update({f"sesgo_{unit}": round(bias, 4), f"de_{unit}": round(sd, 4),
+                   f"limites_acuerdo_{unit}": [round(bias - 1.96 * sd, 4), round(bias + 1.96 * sd, 4)],
+                   f"media_sistema_{unit}": round(sum(s for s, _ in pairs) / len(pairs), 4),
+                   f"media_referencia_{unit}": round(sum(r for _, r in pairs) / len(pairs), 4)})
     return result
+
+
+class SpanSet:
+    """Tramos [inicio, fin) (en segundos o en cuadros) para preguntar rápido si un instante cae en alguno.
+    eps absorbe el redondeo a milisegundos de los tiempos guardados (muy por debajo de un cuadro)."""
+
+    def __init__(self, spans):
+        self.spans = merge(spans)
+        self.starts = [s for s, _ in self.spans]
+
+    def contains(self, x, pad=0.0, eps=2e-3):
+        i = bisect.bisect_right(self.starts, x + pad + eps) - 1
+        return i >= 0 and x - pad < self.spans[i][1] - eps
 
 
 def match(system, reference, tol):
@@ -166,7 +187,9 @@ class Session:
         if self.start is None:      # sesiones anteriores a ese campo: primer frame en monitoreo
             self.start = next((r["t"] for r in self.trace if r["fase"] == "monitoreo"), None)
         self.end = self.summary.get("duracion_s")
-        self.microsleep_min_s = ((self.meta.get("parametros") or {}).get("ojos") or {}).get("microsueno_min_s", 1.0)
+        params = self.meta.get("parametros") or {}
+        self.microsleep_min_s = (params.get("ojos") or {}).get("microsueno_min_s", 1.0)
+        self.p80 = (params.get("perclos") or {}).get("cierre_min", P80_CLOSURE)
         self.reentries = self._posture_reentries()
 
     def _load_trace(self, path):
@@ -281,6 +304,8 @@ class Reference:
         rows = read_csv(path)
         self.blind = bool(rows) and all(r.get("ciego") == "1" for r in rows)
         self.events, self.not_evaluable, self.warnings = [], [], []
+        # Tramos O (los dos ojos totalmente cerrados), referencia de PERCLOS: [inicio, fin) en segundos y en cuadros
+        self.closed = []
         points = notes = 0
         for r in rows:
             start, end = to_float(r["t_s"]), to_float(r.get("fin_t_s"))
@@ -289,6 +314,10 @@ class Reference:
             kind = r["tipo"]
             if kind == "NO_EVALUABLE":
                 self.not_evaluable.append((start, end, r.get("comentario", "")))
+            elif kind == "OJO_CERRADO":
+                frames = (to_float(r.get("frame")), to_float(r.get("fin_frame")))
+                self.closed.append({"inicio": start, "fin": end, "frames": None if None in frames else
+                                    (int(frames[0]), int(frames[1]))})
             elif kind in REFERENCE_TYPES:
                 self.events.append(new_event(REFERENCE_TYPES[kind], "referencia", kind, start, end,
                                              r.get("comentario", "")))
@@ -310,6 +339,19 @@ class Reference:
             duplicated = sum(1 for a, b in zip(spans, spans[1:]) if b[0] <= a[1])
             if duplicated:
                 self.warnings.append(f"{duplicated} anotaciones de {cls} se solapan con otra: ¿duplicadas?")
+        # Guía, sección 3 (O): el ojo cerrado va dentro de un parpadeo (B) o de un cierre largo (M) y su fin es el
+        # primer cuadro con la pupila visible, así que no puede durar cero
+        closures = [(e["inicio"], e["fin"]) for e in self.events if e["clase"] in ("parpadeo", "cierre_largo")]
+        outside = [c for c in self.closed
+                   if not any(s - 0.05 <= c["inicio"] and c["fin"] <= e + 0.05 for s, e in closures)]
+        if outside:
+            self.warnings.append(f"{len(outside)} tramos de ojo cerrado (O) no están dentro de un parpadeo (B) ni de "
+                                 "un cierre largo (M): " + ", ".join(f"{c['inicio']:.2f} s" for c in outside[:5]))
+        empty = [c for c in self.closed if c["fin"] <= c["inicio"]]
+        if empty:
+            self.warnings.append(f"{len(empty)} tramos de ojo cerrado (O) duran cero: el fin es el primer cuadro con la "
+                                 "pupila visible, no el último cerrado (" + ", ".join(f"{c['inicio']:.2f} s"
+                                                                                    for c in empty[:5]) + ")")
 
 
 # ---------------------------------------------------------------------- evaluación
@@ -413,8 +455,69 @@ def evaluate(session, reference):
         "descartes": discards,
         "excluidos": excluded,
         "pares_duracion": durations,
+        "perclos": perclos_agreement(session, reference),
     }
     return report, system + ref
+
+
+def perclos_agreement(session, reference):
+    """Estado por cuadro que suma PERCLOS (cierre >= P80) frente a los tramos O de la referencia (guía, sección 4;
+    mismo diseño que E8). Solo los cuadros que cuenta PERCLOS: en conteo, con postura válida y evaluables.
+      - positivo: dentro de un O (los dos ojos totalmente cerrados);
+      - negativo: a más de PERCLOS_MARGIN_FRAMES cuadros de todo B, M u O (ojo abierto);
+      - intermedio: el resto de cada parpadeo o cierre, donde un cierre >= 80 % sin llegar al 100 % puede ser
+        correcto o no según el párpado (no entra en las tasas).
+    Por ventana de 60 s, el PERCLOS del sistema debería quedar entre el de los O y el de todos los B, M y O.
+    Devuelve None si la referencia no tiene tramos O."""
+    if not reference.closed or session.start is None or not session.trace:
+        return None
+    dt = 1.0 / session.fps
+    rows = session.trace
+    # En cuadros si los dos lo permiten (en vivo los tiempos de la traza y del video pueden diferir en redondeos)
+    by_frame = all(c["frames"] for c in reference.closed) and all(r["frame"] is not None for r in rows)
+    closed = SpanSet([c["frames"] if by_frame else (c["inicio"], c["fin"]) for c in reference.closed])
+    closures = SpanSet([(e["inicio"], e["fin"]) for e in reference.events if e["clase"] in ("parpadeo", "cierre_largo")]
+                       + [(c["inicio"], c["fin"]) for c in reference.closed])
+    excluded = SpanSet([(s, e) for s, e, _ in reference.not_evaluable] + session.not_counting_intervals())
+    margin = PERCLOS_MARGIN_FRAMES * dt
+    counts = Counter()
+    windows = defaultdict(lambda: [0.0, 0.0, 0.0, 0.0])     # tiempo válido, sistema, O, cualquier cierre anotado
+    for i, r in enumerate(rows):
+        if (r["fase"] != "monitoreo" or r["t"] < session.start or not r["postura_valida"] or r["cierre"] is None
+                or excluded.contains(r["t"])):
+            continue
+        weight = min(rows[i + 1]["t"] - r["t"], MAX_TRACE_GAP_S) if i + 1 < len(rows) else dt
+        system = r["cierre"] >= session.p80
+        ref_closed = closed.contains(r["frame"] if by_frame else r["t"])
+        cls = "pos" if ref_closed else ("int" if closures.contains(r["t"], pad=margin) else "neg")
+        counts[cls] += 1
+        counts[cls + "_sistema"] += system
+        w = windows[int((r["t"] - session.start) // PERCLOS_WINDOW_S)]
+        w[0] += weight
+        w[1] += weight * system
+        w[2] += weight * ref_closed
+        w[3] += weight * (ref_closed or closures.contains(r["t"]))
+    table = [{"inicio_s": round(session.start + k * PERCLOS_WINDOW_S, 3), "tiempo_valido_s": round(valid, 2),
+              "perclos_sistema": round(100 * s / valid, 3), "perclos_ojo_cerrado": round(100 * o / valid, 3),
+              "perclos_cierres": round(100 * a / valid, 3)}
+             for k, (valid, s, o, a) in sorted(windows.items()) if valid >= PERCLOS_MIN_VALID_S - 1e-6]
+    return perclos_summary(counts, table)
+
+
+def perclos_summary(counts, table):
+    tp, npos = counts["pos_sistema"], counts["pos"]
+    fp, nneg = counts["neg_sistema"], counts["neg"]
+    inside = sum(1 for w in table
+                 if w["perclos_ojo_cerrado"] - 1 <= w["perclos_sistema"] <= w["perclos_cierres"] + 1)
+    return {"conteos": {k: counts[k] for k in ("pos", "pos_sistema", "neg", "neg_sistema", "int", "int_sistema")},
+            "sensibilidad": round(tp / npos, 4) if npos else None, "sensibilidad_ic95": wilson(tp, npos),
+            "falsos_positivos": round(fp / nneg, 5) if nneg else None, "falsos_positivos_ic95": wilson(fp, nneg),
+            "ventanas_validas": len(table), "ventanas_en_intervalo": inside,
+            "acuerdo_ventanas_pp": bland_altman([(w["perclos_sistema"], w["perclos_ojo_cerrado"]) for w in table],
+                                                unit="pp"),
+            "ventanas": table,
+            "parametros": {"margen_frames": PERCLOS_MARGIN_FRAMES, "ventana_s": PERCLOS_WINDOW_S,
+                           "ventana_minima_s": PERCLOS_MIN_VALID_S, "intervalo": "[O - 1, B/M/O + 1] puntos"}}
 
 
 # ---------------------------------------------------------------------- acuerdo entre anotadores
@@ -461,6 +564,13 @@ def agreement(session, ref_a, ref_b):
                        "f1_eventos": round(2 * tp / (len(a) + len(b)), 4) if a or b else None,
                        "kappa_frames": None if kappa is None else round(kappa, 4),
                        "kappa_interpretacion": landis_koch(kappa), "frames": len(frames)}
+    if ref_a.closed or ref_b.closed:      # ojo cerrado (O): solo cuadro a cuadro
+        spans_a, spans_b = (SpanSet([(c["inicio"], c["fin"]) for c in ref.closed]) for ref in (ref_a, ref_b))
+        kappa = cohen_kappa([spans_a.contains(t) for t in frames], [spans_b.contains(t) for t in frames])
+        result["ojo_cerrado"] = {"eventos_" + ref_a.name: len(ref_a.closed), "eventos_" + ref_b.name: len(ref_b.closed),
+                                 "coinciden": None, "f1_eventos": None,
+                                 "kappa_frames": None if kappa is None else round(kappa, 4),
+                                 "kappa_interpretacion": landis_koch(kappa), "frames": len(frames)}
     return result
 
 
@@ -504,6 +614,23 @@ def print_report(report):
     for origin, counts in report["excluidos"].items():
         if counts:
             print(f"  Excluidos ({origin}): " + ", ".join(f"{k}: {v}" for k, v in counts.items()))
+    if report.get("perclos"):
+        print_perclos(report["perclos"])
+
+
+def print_perclos(p):
+    c = p["conteos"]
+    sens = "-" if p["sensibilidad"] is None else fmt_ci(p["sensibilidad"], p["sensibilidad_ic95"])
+    fp = "-" if p["falsos_positivos"] is None else f"{100 * p['falsos_positivos']:.2f} %"
+    print(f"  PERCLOS por cuadro frente al ojo cerrado anotado (O): sensibilidad {sens} ({c['pos_sistema']}/{c['pos']}),"
+          f" falsos positivos {fp} ({c['neg_sistema']}/{c['neg']}), intermedios contados {c['int_sistema']}/{c['int']}")
+    line = (f"  PERCLOS por ventana de 60 s: {p['ventanas_en_intervalo']} de {p['ventanas_validas']} dentro de "
+            f"[O − 1, cierres anotados + 1] puntos")
+    ba = p["acuerdo_ventanas_pp"]
+    if ba.get("sesgo_pp") is not None:
+        low, high = ba["limites_acuerdo_pp"]
+        line += f"; sistema − O: sesgo {ba['sesgo_pp']:+.2f}, límites de acuerdo {low:+.2f} a {high:+.2f} puntos"
+    print(line)
 
 
 def write_outputs(session, reference, report, events):
@@ -531,6 +658,13 @@ def combine(reports):
     total["parpadeo_postura_valida"] = metrics(sum(m["aciertos"] for m in second),
                                                sum(m["falsos_positivos"] for m in second),
                                                sum(m["falsos_negativos"] for m in second))
+    perclos = [report["perclos"] for report in reports if report.get("perclos")]
+    if perclos:
+        counts, table = Counter(), []
+        for p in perclos:
+            counts.update(p["conteos"])
+            table += p["ventanas"]
+        total["perclos"] = perclos_summary(counts, table)
     return total
 
 
@@ -596,9 +730,13 @@ def main():
             print(f"\nSujeto {subject} ({len(by_subject[subject])} sesiones)")
             print_metrics_table([(cls, total[cls]) for cls in CLASSES]
                                 + [("parpadeo*", total["parpadeo_postura_valida"])])
+            if total.get("perclos"):
+                print_perclos(total["perclos"])
         print(f"\nTOTAL ({len(reports)} sesiones, {len(by_subject)} sujetos)")
         print_metrics_table([(cls, summary["total"][cls]) for cls in CLASSES]
                             + [("parpadeo*", summary["total"]["parpadeo_postura_valida"])])
+        if summary["total"].get("perclos"):
+            print_perclos(summary["total"]["perclos"])
         print("  Los eventos de una misma persona no son independientes: los intervalos del total son "
               "orientativos; reporta también los resultados por sujeto.")
         if args.salida:

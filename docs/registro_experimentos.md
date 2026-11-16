@@ -428,3 +428,38 @@ minuto difiere de la referencia en menos de ±1 punto. Dos límites:
 
 Queda por validar PERCLOS en somnolencia real y alrededor de los umbrales: videos propios con cierres largos anotados
 o un conjunto con PERCLOS alto.
+
+**Comprobación de la implementación.** `evaluar.py` incorpora esta comparación (tramos O de la guía, versión 2). Con
+los tramos O sacados de Eyeblink8 y el cierre de la traza tal como se grabó, da los mismos conteos que un cálculo
+independiente en los 8 videos: 1 440 positivos, 57 830 negativos, 2 909 intermedios; 1 214, 21 y 97 de ellos con
+cierre ≥ 0,80.
+
+---
+
+## E9 — PERCLOS con cierres voluntarios largos y trampas, en videos propios (criterio fijado el 2026-11-16, antes de grabar)
+
+**Motivación.** E8 valida el estado por cuadro con PERCLOS bajos (personas alertas, solo parpadeos). Falta probarlo
+cerca de los umbrales de alerta (8 % y 12 %), con cierres largos y con situaciones que pueden engañarlo: mirar hacia
+abajo, entrecerrar los ojos y girar la cabeza.
+
+**Hipótesis.** Con el nivel de ojo cerrado medido en la calibración, el estado por cuadro (cierre ≥ 0,80) y el
+PERCLOS por minuto coinciden con la anotación O también con cierres largos y con las trampas.
+
+**Datos.** Dos videos de la misma persona con el guion `docs/guion_perclos.md` (sin gafas y con gafas), grabados con
+`--grabar` y la versión del sistema del commit en que se graben. Referencia: anotación en modo ciego con B, M, X y O
+(guía, versión 2). Si la calibración de un video no mide el ojo cerrado (`ojo_cerrado_medido` falso), se repite la
+grabación: es un fallo de protocolo, no un resultado.
+
+**Criterio (sumando los dos videos, con `evaluar.py`).**
+- C1: sensibilidad por cuadro ≥ 0,80.
+- C2: falsos positivos por cuadro ≤ 1 %.
+- C3: al menos el 90 % de las ventanas de 60 s válidas dentro de [O − 1, B/M/O + 1] puntos.
+- C4: límites de acuerdo de Bland-Altman del PERCLOS por ventana (sistema − O) dentro de ±2 puntos, la histéresis de
+  la alerta (`HYSTERESIS_PCT`): con ese error un minuto no salta más de un nivel cerca de los umbrales.
+- Se valida si cumple C1 a C4.
+- Se informan sin que decidan: el nivel de alerta de cada ventana según el sistema y según O (normal < 8 %,
+  precaución 8-12 %, somnolencia ≥ 12 %); el PERCLOS del minuto de trampas (3-4); los resultados por video; y la
+  kappa por cuadro de O si hay un segundo anotador.
+
+**Alcance.** Cierres voluntarios de una persona y unas 10 ventanas: valida la medida de PERCLOS cerca de los
+umbrales, no que esos umbrales detecten la somnolencia real.

@@ -14,7 +14,9 @@ Revisión de vídeos con barra de tiempo. Dos modos:
      La referencia para la validación se anota siempre con --ciego (oculta lo detectado por el sistema),
      siguiendo docs/guia_anotacion.md. Sin --ciego es una revisión para encontrar errores, no referencia.
      B / Y / K / M anotan parpadeo / bostezo / micro-bostezo / cierre largo como intervalo (tecla al
-     inicio y otra vez al final). X marca un tramo y pide un comentario: con --ciego es NO_EVALUABLE (cara
+     inicio y otra vez al final). O marca el tramo con los dos ojos totalmente cerrados (pupila tapada), la
+     referencia de PERCLOS (se anota en una segunda pasada, cuadro a cuadro, dentro de cada B y M).
+     X marca un tramo y pide un comentario: con --ciego es NO_EVALUABLE (cara
      tapada, fuera de cuadro...; la evaluación lo excluye); sin --ciego, PROBLEMA (nota de un error).
      U deshace la última anotación, E borra la del cursor y Q guarda y sale.
      --anotador NOMBRE solo hace falta si anota otra persona además del anotador principal (acuerdo entre
@@ -64,8 +66,9 @@ CACHE_DIR = os.path.join(paths.data_dir(), "cache_revisor")
 
 # Micro-bostezo (K): bostezo contenido o con poca apertura bucal; el sistema lo separa con umbrales
 # (MICRO_BOSTEZO), el anotador por apreciación visual. M = cierre largo (micro-sueño conductual, >= 1 s).
+# O = ojo cerrado: los dos ojos con la pupila totalmente tapada; referencia del estado que suma PERCLOS (guía, 3).
 ANNOTATION_KEYS = {ord("b"): "PARPADEO", ord("y"): "BOSTEZO", ord("k"): "MICRO_BOSTEZO",
-                   ord("m"): "MICRO_SUENO", ord("x"): "PROBLEMA"}
+                   ord("m"): "MICRO_SUENO", ord("o"): "OJO_CERRADO", ord("x"): "PROBLEMA"}
 # En modo ciego (referencia) la X marca un tramo NO_EVALUABLE: algo que impide ver los ojos o la boca (cara
 # tapada, fuera de cuadro...). Se decide solo por lo que se ve, sin ver el sistema, y la evaluación excluye
 # ese tramo. Fuera del modo ciego la X es un PROBLEMA (nota para el análisis de errores).
@@ -916,7 +919,8 @@ class SessionReviewer(Viewer):
 
     def _annotations_card(self, c, y):
         counts = Counter(a["tipo"] for a in self.annotations)
-        order = ["PARPADEO", "BOSTEZO", "MICRO_BOSTEZO", "MICRO_SUENO", "NO_EVALUABLE" if self.blind else "PROBLEMA"]
+        order = ["PARPADEO", "BOSTEZO", "MICRO_BOSTEZO", "MICRO_SUENO", "OJO_CERRADO",
+                 "NO_EVALUABLE" if self.blind else "PROBLEMA"]
 
         def chips(c, x, y, w):
             cx, cy = x, y
@@ -978,7 +982,7 @@ class SessionReviewer(Viewer):
         return [NAVIGATION_KEYS,
                 ("Anotar: la tecla al inicio y otra vez al final",
                  [(["B"], "Parpadeo"), (["Y"], "Bostezo"), (["K"], "Micro-bostezo"), (["M"], "Cierre largo ≥ 1 s"),
-                  (["X"], "No evaluable" if self.blind else "Problema")]),
+                  (["O"], "Ojo cerrado"), (["X"], "No evaluable" if self.blind else "Problema")]),
                 ("Corregir", [(["U"], "Deshacer la última"), (["E"], "Borrar la del cursor"),
                               (["Q"], "Guardar y salir")])]
 
@@ -989,7 +993,7 @@ class SessionReviewer(Viewer):
 
     def legend_items(self):
         mine = [(ui.ANNOTATION_LABELS[k], ui.EVENT_COLORS[k])
-                for k in ("PARPADEO", "BOSTEZO", "MICRO_BOSTEZO", "MICRO_SUENO")]
+                for k in ("PARPADEO", "BOSTEZO", "MICRO_BOSTEZO", "MICRO_SUENO", "OJO_CERRADO")]
         if self.blind:
             return mine + [("No evaluable", ui.EVENT_COLORS["NO_EVALUABLE"])]
         return [("Midiendo", ui.STATE_COLORS["midiendo"]), ("Calibrando", ui.STATE_COLORS["calibrando"]),
@@ -999,7 +1003,7 @@ class SessionReviewer(Viewer):
                 ("Micro-bostezo", ui.EVENT_COLORS["MICRO_BOSTEZO"]), ("Micro-sueño", ui.EVENT_COLORS["MICRO_SUENO"]),
                 ("Sonrisa", ui.EVENT_COLORS["SONRISA"]), ("Giro rápido", ui.EVENT_COLORS["PARPADEO_DESCARTADO_GIRO"]),
                 ("Poco profundo", ui.EVENT_COLORS["PARPADEO_DESCARTADO_PROFUNDIDAD"]),
-                ("Problema", ui.EVENT_COLORS["PROBLEMA"])]
+                ("Ojo cerrado", ui.EVENT_COLORS["OJO_CERRADO"]), ("Problema", ui.EVENT_COLORS["PROBLEMA"])]
 
     def draw_static_rows(self, c, rows, width):
         x0, x1 = self._track_x(width)
@@ -1016,10 +1020,13 @@ class SessionReviewer(Viewer):
 
     def draw_dynamic_rows(self, c, rows, width):
         top, bottom = rows["tu"]
-        for a in self.annotations:
+        lower = bottom - (bottom - top) // 2
+        # El ojo cerrado va dentro de un parpadeo o cierre largo: se dibuja encima, en la mitad de abajo
+        for a in sorted(self.annotations, key=lambda a: a["tipo"] == "OJO_CERRADO"):
             xs = self.frame_to_x(a["frame"], width)
             xe = xs if a.get("fin_frame") is None else self.frame_to_x(a["fin_frame"], width)
-            c.draw.rounded_rectangle((xs, top, max(xe, xs + 3), bottom), radius=2,
+            y0 = lower if a["tipo"] == "OJO_CERRADO" else top
+            c.draw.rounded_rectangle((xs, y0, max(xe, xs + 3), bottom), radius=2,
                                      fill=ui.EVENT_COLORS.get(a["tipo"], ui.TEXT))
         if self.pending is not None:    # intervalo a medio marcar: contorno hasta el cursor
             color = ui.EVENT_COLORS.get(self.pending["tipo"], ui.TEXT)
