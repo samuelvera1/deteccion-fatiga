@@ -197,31 +197,42 @@ def camera_available(index=0):
 
 
 def run_with_windows():
-    """Modo con ventanas: inicio -> sesión -> resumen, y de ahí a una sesión nueva o a salir."""
+    """Modo con ventanas: inicio -> sesión -> resumen, y de ahí a una sesión nueva o a salir. Todo en una sola
+    ventana (gui.App) que cambia de pantalla; cerrarla con la X termina el programa."""
+    import display
     import gui
     import session_view
-    while True:
-        choice = gui.ask_start()
-        if choice is None:
-            return
-        while not camera_available():
-            if gui.camera_error() != "retry":
-                return
-        monitor = run_session(parse_args(options_to_argv(choice)))
-        print_summary(monitor)
+    display.use(gui.VideoScreen)         # el monitor y el revisor, dentro de la misma ventana
+    try:
         while True:
-            view = session_view.summary_view(monitor.session.metadata, monitor.closure_reliable, monitor.session.dir)
-            action = gui.show_summary(view)
-            if action != "review":
-                break
-            mode = gui.ask_review(view)
-            if mode:
-                import revisar
-                problem = revisar.review_session(monitor.session.dir, blind=(mode == "blind"))
-                if problem:
-                    gui.show_error(problem)
-        if action != "new":
-            return
+            choice = gui.ask_start()
+            if choice is None:
+                return
+            while not camera_available():
+                if gui.camera_error() != "retry":
+                    return
+            if gui.closed():
+                return
+            monitor = run_session(parse_args(options_to_argv(choice)))
+            print_summary(monitor)
+            while not gui.closed():
+                view = session_view.summary_view(monitor.session.metadata, monitor.closure_reliable,
+                                                 monitor.session.dir)
+                action = gui.show_summary(view)
+                if action != "review":
+                    break
+                mode = gui.ask_review(view)
+                if mode:
+                    import revisar
+                    problem = revisar.review_session(monitor.session.dir, blind=(mode == "blind"))
+                    if problem:
+                        gui.show_error(problem)
+            else:
+                return
+            if action != "new":
+                return
+    finally:
+        gui.close()
 
 
 def main(argv=None):

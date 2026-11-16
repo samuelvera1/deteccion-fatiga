@@ -9,6 +9,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+import display  # noqa: E402
 import gui  # noqa: E402
 import main  # noqa: E402
 from tests import golden_master as gm  # noqa: E402
@@ -31,6 +32,7 @@ def fake_summary(view):
 
 
 gui.ask_start, gui.show_summary = fake_start, fake_summary
+gui.VideoScreen = display.OpenCvWindow          # el monitor sin ventana (las funciones de OpenCV están anuladas)
 gui.camera_error = lambda: calls.__setitem__("camera", calls["camera"] + 1) or None
 real_parse = main.parse_args
 main.parse_args = lambda argv=None: real_parse(list(argv or []) + ["--fuente", VIDEO, "--sin-sonido"] if argv is not None else None)

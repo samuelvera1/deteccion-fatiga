@@ -132,16 +132,13 @@ class HudRenderer:
 
     # ------------------------------------------------------------------ ajuste a la ventana
 
-    def present(self, canvas):
-        """Ajusta el fotograma al tamaño actual de la ventana, sin deformarlo y centrado (franjas del color
-        del fondo). Así se ve bien en cualquier pantalla y al redimensionar la ventana."""
+    def present(self, canvas, window):
+        """Ajusta el fotograma al tamaño actual de la ventana (display.py), sin deformarlo y centrado (franjas del
+        color del fondo). Así se ve bien en cualquier pantalla y al redimensionar la ventana."""
         if self._frames % 10 == 0:
-            try:
-                _, _, w, h = cv2.getWindowImageRect(WINDOW_NAME)
-            except cv2.error:
-                w = h = 0
-            if w > 0 and h > 0:
-                self._window = (w, h)
+            size = window.size()
+            if size:
+                self._window = size
         self._frames += 1
         out = fit_to_window(canvas, self._window, self._fit_buffer)
         if out is not canvas:

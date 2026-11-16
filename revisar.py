@@ -49,6 +49,7 @@ import cv2
 import numpy as np
 
 import calibration_marks
+import display
 import paths
 import revisar_ui as ui
 
@@ -471,22 +472,22 @@ class Viewer:
             self.seek(self.x_to_frame(x, self._canvas_w))
 
     def run(self):
-        cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
-        cv2.setMouseCallback(WINDOW, self._on_mouse)
+        window = display.open_window(WINDOW)
+        window.on_mouse(self._on_mouse)
         frame_ms = 1000.0 / self.fps
         while True:
+            if not window.is_open():         # cerrada con la X
+                break
             started = time.perf_counter()
             if self.store.done and not self._load_reported:
                 self._load_reported = True
                 self.on_loaded()
             if self.playing:
                 self._advance_playback()
-            cv2.imshow(WINDOW, self.render())
+            window.show(self.render())
             # Reproducción a velocidad real: se espera solo lo que falta para completar un frame
             elapsed_ms = (time.perf_counter() - started) * 1000
-            key = cv2.waitKey(max(1, int(frame_ms - elapsed_ms)) if self.playing else 30) & 0xFF
-            if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
-                break
+            key = window.wait_key(max(1, int(frame_ms - elapsed_ms)) if self.playing else 30)
             if key == 255:
                 continue
             self.ui_version += 1
@@ -505,7 +506,7 @@ class Viewer:
                 self.seek(self.pos + int(round(self.fps)) * (1 if key == ord("l") else -1))
             else:
                 self.handle_key(key)
-        cv2.destroyAllWindows()
+        window.close()
         self.on_exit()
 
 

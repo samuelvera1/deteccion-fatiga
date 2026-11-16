@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 
 import calibration_marks
+import display
 import fatigue_audio
 import fatigue_geometry
 import fatigue_hud
@@ -401,6 +402,8 @@ class FatigueMonitor(Thresholds):
             self.kss = None
         if self._is_video_file():
             self.alert.sound = False      # analizando un vídeo: alertas registradas, sin sonido
+        # Antes de abrir la cámara (tarda unos segundos): así se ve enseguida que la sesión está empezando
+        window = display.open_window(fatigue_hud.WINDOW_NAME, fatigue_hud.window_size())
         cap = cv2.VideoCapture(self.video_source)
         frame_size = self._configure_camera(cap)
         native_fps = cap.get(cv2.CAP_PROP_FPS) or None
@@ -424,10 +427,9 @@ class FatigueMonitor(Thresholds):
             self.recorder = FrameRecorder(self.session.dir, frame_size, native_fps)
             print(f"[GRABACION] Se guarda lo que ve la cámara en {self.session.dir} (para anotarlo después)")
 
-        cv2.namedWindow(fatigue_hud.WINDOW_NAME, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(fatigue_hud.WINDOW_NAME, *fatigue_hud.window_size())
-
         while True:
+            if not window.is_open():         # cerrada con la X
+                break
             success, img = cap.read()
             if not success:
                 break
@@ -454,15 +456,15 @@ class FatigueMonitor(Thresholds):
             if self.kss and self._monitoring_started and self.kss.due(self._now):
                 self._ask_kss("inicio" if not self.kss.responses else "periodica")
 
-            img = self.hud.present(self.hud.render(img, self, is_microsleep_active, is_yawning_active))
-            cv2.imshow(fatigue_hud.WINDOW_NAME, img)
-            key = cv2.waitKey(1) & 0xFF
+            img = self.hud.present(self.hud.render(img, self, is_microsleep_active, is_yawning_active), window)
+            window.show(img)
+            key = window.wait_key(1)
             if key == ord(' ') and self._is_video_file():
                 # Pausa (solo vídeos: el reloj es el del archivo, así que pausar no altera las mediciones)
                 key = 0
                 while key not in (ord(' '), ord('q')):
-                    key = cv2.waitKey(50) & 0xFF
-                    if cv2.getWindowProperty(fatigue_hud.WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
+                    key = window.wait_key(50)
+                    if not window.is_open():
                         key = ord('q')       # ventana cerrada durante la pausa
                 self.session.reset_tick()    # el tiempo en pausa no cuenta en los FPS de procesamiento
             if self.kss and self.kss.prompt and ord('1') <= key <= ord('9'):
@@ -480,7 +482,7 @@ class FatigueMonitor(Thresholds):
                 self.recalibrate("manual", full=True)
 
         cap.release()
-        cv2.destroyAllWindows()
+        window.close()
         if self.recorder:
             print("[GRABACION] Terminando de guardar el vídeo...")
             self.session.metadata["grabacion"] = self.recorder.close()
