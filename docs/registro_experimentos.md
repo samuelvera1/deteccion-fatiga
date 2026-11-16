@@ -200,7 +200,20 @@ minuto. Va en la dirección de la literatura, pero sin poder estadístico. PERCL
 medido en 7 de 12 videos).
 
 **Decisión.** Piloto no concluyente. La exclusión por postura deja fuera la mitad de las personas en videos de
-teléfono. Con E5 (parpadeos también fuera de rango, adoptado después), una repetición con más partes de UTA-RLDD
+teléfono.
+
+### E4b — Repetición con más personas de UTA-RLDD (criterio fijado el 2026-11-16, antes de procesar)
+
+- **Datos.** Todas las partes de UTA-RLDD que se descarguen, incluida Fold1_part1 (reprocesada). Solo los videos
+  alerta (0) y somnoliento (10). Versión 1.1.0 del sistema (parpadeos también con la postura fuera de rango, E5).
+- **Calidad.** Se excluye un video si el rostro se detecta en menos del 50 % de los cuadros o si hay menos de 3
+  minutos de conteo (desde el inicio del conteo, con rostro), y una persona si le falta alguno de sus dos videos.
+- **Medida principal.** Igual que E4: diferencia por persona de la mediana de duración del parpadeo (10 − 0).
+- **Criterio.** Se considera que los datos apoyan la hipótesis si la prueba de rangos con signo de Wilcoxon unilateral
+  da p < 0,05 con al menos 15 personas válidas. Se informan también la prueba de los signos, la mediana de las
+  diferencias y su intervalo de confianza del 95 % (bootstrap por persona).
+- **Exploratorio.** Frecuencia de parpadeo, proporción de parpadeos de ≥ 0,5 s y PERCLOS (no fiable sin ojo cerrado
+  medido). Con E5 (parpadeos también fuera de rango, adoptado después), una repetición con más partes de UTA-RLDD
 debería usar como criterio de calidad el tiempo de conteo con rostro, no el de postura válida, y fijarse antes de
 procesar.
 
