@@ -149,3 +149,30 @@ calibración), P50 sobrestima.
 ejemplo, con −0,27 un ojo cerrado del todo marcaría un cierre de ~0,65) y PERCLOS dejaría de detectar cierres. Vías
 para un nuevo intento: exigir más parpadeos (el peor caso tenía 5) o combinar el estimador con una comprobación de
 que la malla registra el cierre.
+
+---
+
+## E4 — Somnolencia real: duración del parpadeo en UTA-RLDD (piloto, 2026-11-16)
+
+**Pregunta.** ¿Los indicadores del sistema cambian cuando la persona está realmente somnolienta?
+
+**Datos.** UTA-RLDD (Ghoddoosian et al., 2019), primera parte (Fold1_part1): 6 personas, 3 videos cada una de unos
+10 minutos grabados por ellas mismas con su teléfono o cámara, etiquetados por la propia persona como alerta (0),
+poco alerta (5) y somnolienta (10). Versión del sistema: commit en el que se registra este criterio (profundidad
+mínima D = 0,30), sin cambiar parámetros. Calibración automática; como los videos no tienen el paso de ojos
+cerrados, el grado de cierre no es fiable.
+
+**Hipótesis (Caffier et al., 2003; Ingre et al., 2006).** La duración media del parpadeo es mayor en el video
+somnoliento (10) que en el alerta (0) de la misma persona. La duración la mide el sistema con la referencia local
+(no depende del nivel de ojo cerrado).
+
+**Criterio (fijado antes de procesar).**
+- Medida principal: por persona, diferencia de la mediana de duración de los parpadeos contados (PARPADEO y
+  PARPADEO_PROLONGADO) entre el video 10 y el 0.
+- Se considera que el piloto apoya la hipótesis si la diferencia es positiva en al menos 5 de las 6 personas. Se
+  informan la prueba de los signos y la de rangos con signo de Wilcoxon (unilaterales), sabiendo que con 6 personas
+  la potencia es baja.
+- Calidad: se excluye un video si el rostro se detecta en menos del 50 % de los cuadros o si hay menos de 3 minutos
+  de conteo con postura válida; se informa cuántos.
+- Exploratorio (no decide): frecuencia de parpadeo por minuto, proporción de parpadeos de 0,5 s o más, el video
+  intermedio (5) y PERCLOS (calculado con el ojo cerrado de reserva, marcado como no fiable).
