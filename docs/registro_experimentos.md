@@ -316,3 +316,18 @@ Eyeblink8 y la piloto propia). Señales reextraídas con la misma configuración
   0,01. Se informa la sesión piloto por separado.
 - Se adopta si cumple C1 y C2. El grado de cierre (PERCLOS, micro-sueño) se recalibraría con la nueva señal; su
   validación queda para DROZY.
+
+Detalles fijados antes de ver los resultados: el diámetro vertical del iris es el par de puntos con mayor componente
+vertical (mediana de la sesión) y se suaviza por ojo con la misma media móvil que la IPD (0,2).
+
+**Resultado.** Control: la apertura/IPD recalculada difiere un 2,1 % (mediana) de la traza.
+- C1: mediana del |cierre aparente| con cabeceo de 10-30° (1 462 cuadros, sesiones propias): IPD 0,258; iris 0,307.
+  **No cumple**: el iris no corrige el efecto de la postura, incluso lo aumenta. Es coherente con E1: en estas
+  sesiones el efecto parece deberse al párpado que acompaña a la mirada, no a la proyección.
+- C2: F1 de parpadeos en las 9 grabaciones (configuración E5): IPD 0,950 (371/21/18); iris 0,956 (372/17/17).
+  Cumple.
+- Piloto propio (no decide): FP de 5 a 2. Desaparecen los 3 parpadeos prolongados falsos al inclinar la cabeza.
+
+**Decisión.** NO SE ADOPTA (no cumple C1). Hipótesis nueva, posterior a ver estos datos (E7b): usar la señal del iris
+solo para detectar parpadeos, manteniendo la de la IPD para el grado de cierre. Debe probarse en datos no vistos
+(DROZY u otro conjunto), no en estos.
