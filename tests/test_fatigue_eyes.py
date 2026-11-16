@@ -15,7 +15,7 @@ FPS = 30.0
 OPEN = 0.12
 
 
-def run(depth, frames=4):
+def run(depth, frames=4, pose_valid=True):
     """Ojo abierto 1,5 s, una caída de la apertura de la profundidad dada durante `frames` cuadros y 1 s abierto."""
     profile = SubjectProfile()
     profile.open_ear_baseline, profile.closed_ear_level, profile.closed_level_measured = OPEN, 0.04, True
@@ -24,7 +24,7 @@ def run(depth, frames=4):
                             lambda kind, *args, **kwargs: events.append(kind))
     signal = [OPEN] * 45 + [OPEN * (1 - depth)] * frames + [OPEN] * 30
     for i, ear in enumerate(signal):
-        eyes.update(ear, False, i / FPS)
+        eyes.update(ear, False, i / FPS, pose_valid)
     return eyes, events
 
 
@@ -44,6 +44,18 @@ class BlinkDepthTest(unittest.TestCase):
     def test_algo_por_encima_del_umbral_cuenta(self):
         eyes, _ = run(EyeEventDetector.BLINK_MIN_DEPTH + 0.01)
         self.assertEqual(eyes.blink_count, 1)
+
+
+class PoseOutOfRangeTest(unittest.TestCase):
+    """E5: con la postura fuera de rango se cuentan los parpadeos, pero no el PERCLOS."""
+
+    def test_parpadeo_fuera_de_rango_cuenta(self):
+        eyes, _ = run(0.5, pose_valid=False)
+        self.assertEqual(eyes.blink_count, 1)
+
+    def test_perclos_no_cuenta_fuera_de_rango(self):
+        eyes, _ = run(0.9, frames=10, pose_valid=False)
+        self.assertEqual(eyes.perclos.total_time, 0.0)
 
 
 if __name__ == "__main__":

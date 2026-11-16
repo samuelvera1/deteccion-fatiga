@@ -168,14 +168,14 @@ class EyeEventDetector(Thresholds):
         """Parpadeos (referencia local), PERCLOS P80 y micro-sueño. Devuelve micro-sueño activo.
         El % de cierre se mide entre los niveles abierto y cerrado calibrados del sujeto: entrecerrar
         los ojos (al bostezar, hablar o mirar abajo) no llega al 80 % y no cuenta como cierre.
-        Con la postura fuera de rango (pose_valid=False) no se cuentan parpadeos ni PERCLOS (la apertura 2D
-        del ojo no es fiable); el micro-sueño se sigue evaluando por seguridad."""
+        Con la postura fuera de rango (pose_valid=False) no cuenta para PERCLOS (la apertura 2D del ojo no es
+        fiable como nivel), pero los parpadeos sí se cuentan: la referencia local los hace robustos al nivel
+        (experimento E5). El micro-sueño se sigue evaluando por seguridad."""
         closure = self.profile.closure(ear)
+        self._update_blinks(ear, yawn_blocks_blinks, closure >= self.MICROSLEEP_EXIT_CLOSURE, now)
         if pose_valid:
-            self._update_blinks(ear, yawn_blocks_blinks, closure >= self.MICROSLEEP_EXIT_CLOSURE, now)
             self.perclos.update(closure >= self.P80_CLOSURE, now)
         else:
-            self.blink_closed, self.blink_closed_frames = False, 0   # se descarta el episodio en curso
             self.perclos.skip_gap()                                   # el hueco no pesa en el PERCLOS
 
         # Cierre sostenido con histéresis: entra con >= 80 %, sale por debajo de 70 %

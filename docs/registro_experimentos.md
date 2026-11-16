@@ -177,6 +177,33 @@ somnoliento (10) que en el alerta (0) de la misma persona. La duración la mide 
 - Exploratorio (no decide): frecuencia de parpadeo por minuto, proporción de parpadeos de 0,5 s o más, el video
   intermedio (5) y PERCLOS (calculado con el ojo cerrado de reserva, marcado como no fiable).
 
+**Desviación del plan (antes de ver resultados).** Por tiempo de cómputo (4 núcleos compartidos con E5) se dejaron
+de procesar los videos intermedios (5): solo se completó el de la persona 04; los de 01, 02 y 03 se interrumpieron y
+los de 05 y 06 no se ejecutaron. El análisis exploratorio del video intermedio queda sin hacer. La medida principal
+(videos 0 y 10) no cambia.
+
+**Resultado.** Por el criterio de calidad se excluyeron 3 videos con menos de 3 minutos de conteo con postura
+válida: 02 alerta (2,7 min), 04 alerta (2,9 min) y 05 somnoliento (0,6 min). Son videos de teléfono con la cabeza
+inclinada buena parte del tiempo, y el rostro se detectó en el 100 % de los cuadros. Quedaron 3 personas con el
+par completo:
+
+| Persona | Mediana alerta | Mediana somnoliento | Diferencia |
+|---|---|---|---|
+| 01 | 0,133 s | 0,167 s | +34 ms |
+| 03 | 0,300 s | 0,433 s | +133 ms |
+| 06 | 0,200 s | 0,168 s | −32 ms |
+
+Positiva en 2 de 3 (signos p = 0,50; Wilcoxon p = 0,25). El criterio (≥ 5 de 6) **no es evaluable** tal como se
+fijó: solo 3 personas válidas. Exploratorio, medias de los videos válidos, de alerta a somnoliento: mediana de
+duración de 0,200 a 0,268 s; proporción de parpadeos de ≥ 0,5 s de 6 % a 15 %; frecuencia de 17,7 a 12,8 por
+minuto. Va en la dirección de la literatura, pero sin poder estadístico. PERCLOS no es interpretable (ojo cerrado no
+medido en 7 de 12 videos).
+
+**Decisión.** Piloto no concluyente. La exclusión por postura deja fuera la mitad de las personas en videos de
+teléfono. Con E5 (parpadeos también fuera de rango, adoptado después), una repetición con más partes de UTA-RLDD
+debería usar como criterio de calidad el tiempo de conteo con rostro, no el de postura válida, y fijarse antes de
+procesar.
+
 ---
 
 ## E5 — Contar parpadeos también con la postura fuera de rango (2026-11-16)
@@ -199,3 +226,69 @@ gafas), comparando contra la versión actual (profundidad mínima D = 0,30).
 - Regla del proyecto aplicada a un cambio que busca reducir FN: se acepta si, en Eyeblink8, los FN bajan y los FP
   no suben.
 - Se informan también el F1 y el resultado de la sesión piloto, que no deciden.
+
+**Resultado.**
+
+| | VP | FP | FN | F1 | F1 con postura válida |
+|---|---|---|---|---|---|
+| Eyeblink8, versión actual (D = 0,30) | 314 | 18 | 64 | 0,88 | 0,96 |
+| Eyeblink8, con E5 | 361 | 17 | 17 | 0,95 | 0,96 |
+| Piloto propio (gafas), versión actual | 9 | 2 | 2 | 0,82 | 0,82 |
+| Piloto propio (gafas), con E5 | 9 | 5 | 2 | 0,72 | 0,82 |
+
+- Eyeblink8: fuera de rango el sistema contó 47 parpadeos normales (45 aciertos, 2 FP) y 8 prolongados (7 aciertos,
+  1 FP). Sensibilidad de 0,83 a 0,95 sin perder precisión (0,95).
+- Piloto propio: los 3 FP nuevos son PARPADEO_PROLONGADO de 0,9-1,1 s durante inclinaciones deliberadas de la cabeza
+  con giros de 120-143 °/s y cierre aparente de 0,83-0,98: el artefacto de postura que motivó la regla, que además
+  infla un indicador de somnolencia (proporción de parpadeos prolongados).
+
+**Decisión.** SE ACEPTA según el criterio (FN 64 → 17, FP 18 → 17). Advertencia registrada: con gafas y movimientos
+de cabeza deliberados aparecen parpadeos prolongados falsos fuera de rango. Hipótesis para un experimento posterior
+(E5b), que necesita más datos propios con inclinaciones controladas: fuera de rango, contar solo parpadeos de menos
+de 0,5 s (en Eyeblink8 perdería 7 aciertos y quitaría 1 FP; en el piloto quitaría los 3 FP). La implementación en el
+repositorio se hace al terminar E4, que se estaba procesando con el código anterior.
+
+---
+
+## E6 — Búsqueda de parámetros del detector de parpadeos con validación cruzada (2026-11-16)
+
+**Motivación.** El autor pidió iterar de forma autónoma para acercarse al máximo de aciertos. Para que el resultado
+no sea memorizar los videos, la búsqueda se hace con validación cruzada y la regla se fija antes de ejecutarla.
+
+**Herramienta.** Simulador (fuera del repositorio) que ejecuta el EyeEventDetector real sobre las trazas ya
+guardadas, sin MediaPipe. Verificado: reproduce el sistema completo en Eyeblink8 (versión actual: 314/18/64 idéntico;
+con E5: 361/16/17 frente a 361/17/17).
+
+**Datos.** 9 grabaciones con parpadeos anotados: los 8 videos de Eyeblink8 y la sesión piloto propia (gafas).
+
+**Espacio de búsqueda (72 configuraciones).** Postura: excluir (actual) o contar (E5); profundidad mínima D ∈ {0,25,
+0,30, 0,35, 0,40}; factor de la referencia local ∈ {0,75, 0,79, 0,83}; periodo refractario ∈ {2, 3, 5} cuadros.
+
+**Regla (fijada antes de ejecutar).**
+- Validación cruzada dejando una grabación fuera (9 pliegues): en cada pliegue se elige la configuración con mayor F1
+  de parpadeos sumando las otras 8 (empates → la más cercana a la actual) y se aplica a la apartada.
+- Estimación honesta = VP, FP y FN sumados de las 9 grabaciones apartadas.
+- Referencia de comparación: la configuración con E5 y los demás parámetros actuales (sin selección).
+- Se adopta la configuración elegida en la mayoría de pliegues si el F1 de la validación cruzada supera al de la
+  referencia en al menos 0,01 y los FN no aumentan más del 10 %; si no, se mantiene la configuración con E5.
+- Todo lo obtenido aquí es de desarrollo; la prueba definitiva requiere datos nuevos.
+
+**Resultado.**
+
+| | VP | FP | FN | F1 |
+|---|---|---|---|---|
+| Versión del repositorio (excluir postura) | 323 | 20 | 66 | 0,883 |
+| Referencia E5 (contar fuera de rango) | 370 | 21 | 19 | 0,949 |
+| Validación cruzada de la búsqueda | 369 | 15 | 20 | 0,955 |
+
+- La configuración más elegida (8 de 9 pliegues) fue contar fuera de rango, D = 0,40 y factor 0,75; el periodo
+  refractario no cambia nada en estos datos.
+- Mejor F1 descriptivo en las 9 grabaciones: 0,958 (optimista).
+- La sesión piloto propia queda en 9/5/2 con cualquier configuración: sus 3 FP por inclinación de la cabeza no se
+  corrigen con estos parámetros.
+
+**Decisión.** NO se adopta (mejora de 0,006 < 0,01). Se mantiene E5 con los demás parámetros actuales. Conclusión: con
+los datos anotados disponibles, el detector de parpadeos está cerca de su techo por ajuste de parámetros (F1 ≈ 0,95 en
+validación cruzada). Los errores restantes requieren datos nuevos (inclinaciones controladas propias, un segundo
+anotador, otro conjunto público), no más búsqueda. E5b (fuera de rango, solo parpadeos cortos) se estimó a partir de
+los recuentos de E5: perdería 7 aciertos y quitaría 4 FP (F1 ≈ 0,944 < 0,949), así que no se ejecuta.

@@ -69,9 +69,10 @@ class Thresholds:
     # La apertura del ojo se mide en 2D: al inclinar la cabeza arriba/abajo se acorta en la imagen y parece
     # cierre. Sesión 20261006_174416 (S01, con gafas): con |pitch| <= 10° cierre aparente ~0 (mediana -0.04);
     # 10-15° -> 0.33; 30-45° -> 0.71 (hasta 0.93, por encima del P80). El giro lateral (yaw) hasta ~44° no
-    # produjo cierre aparente. PROVISIONAL (1 sujeto). Fuera de rango no se cuentan parpadeos ni PERCLOS;
-    # el micro-sueño se sigue evaluando por seguridad (dormirse suele ir con cabeceo) y el intervalo se
-    # registra como POSTURA_FUERA_DE_RANGO para poder filtrar esos eventos.
+    # produjo cierre aparente. PROVISIONAL (1 sujeto; el efecto no se reprodujo en otras 19 sesiones, E1).
+    # Fuera de rango no cuenta el PERCLOS; los parpadeos sí (E5: en Eyeblink8 FN 64 -> 17 sin subir los FP; en la
+    # sesión piloto con gafas aparecieron 3 parpadeos prolongados falsos al inclinar la cabeza). El micro-sueño se
+    # sigue evaluando (dormirse suele ir con cabeceo) y el intervalo se registra como POSTURA_FUERA_DE_RANGO.
     POSE_MAX_PITCH = 10.0
     POSE_MAX_YAW = 40.0
     # Postura "frontal" exigida por la puerta de estabilidad (calibración y análisis de gafas): la medida de
