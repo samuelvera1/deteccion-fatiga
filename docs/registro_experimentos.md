@@ -116,3 +116,36 @@ positivos, 0,22.
   FN 11). Coincide con el filtro a posteriori (FP 17) salvo un evento.
 - Prueba de regresión: solo cambian los parpadeos (en los 3 videos de referencia se descartan 1, 3 y 1 caídas por
   poco profundas; sin anotaciones para saber si eran reales). Referencia regenerada a propósito.
+
+---
+
+## E3 — Nivel de ojo cerrado estimado con los parpadeos espontáneos (2026-11-16)
+
+**Motivación.** Sin el paso de cerrar los ojos (videos ya grabados, como los de Eyeblink8, o una persona que no lo
+hace bien) el grado de cierre no es fiable y no se pueden medir PERCLOS ni micro-sueños.
+
+**Hipótesis.** El mínimo de la apertura en los parpadeos completos se acerca al nivel de ojo cerrado. Un percentil
+bajo de los mínimos de los parpadeos del primer minuto de conteo estima la proporción ojo cerrado / ojo abierto.
+
+**Datos.** Sesiones propias en vivo con el ojo cerrado medido en la calibración (referencia), sin recalibraciones y
+con al menos 5 parpadeos (profundidad ≥ 0,30) en los primeros 60 s de conteo. Mínimo de cada parpadeo tomado de la
+traza.
+
+**Criterio (fijado antes de calcular).**
+- Candidatos: percentil p ∈ {5, 10, 25, 50} de los mínimos de los parpadeos del primer minuto.
+- Validación cruzada dejando una sesión fuera: en cada pliegue se elige el p con menor error absoluto mediano en las
+  demás sesiones y se aplica a la apartada. Error = proporción estimada − proporción medida (cerrado / abierto).
+- Se acepta si |error| ≤ 0,05 en al menos el 80 % de las sesiones apartadas.
+- Si se acepta, se implementa como calibración alternativa marcada como «estimada» (no sustituye al paso de ojos
+  cerrados cuando se hace).
+
+**Resultado.** 15 sesiones válidas (S01). La validación cruzada eligió el percentil 25 en los 15 pliegues. Error de
+la proporción estimada en la sesión apartada: |error| ≤ 0,05 en 10 de 15 (67 %); error absoluto mediano 0,023; los
+mayores, −0,268 (sesión 20261025_101730, solo 5 parpadeos), −0,075, −0,061, −0,060 y +0,058. Errores por percentil
+(todas las sesiones): P5 y P10 subestiman (el mínimo de un parpadeo suele quedar por debajo del ojo cerrado de la
+calibración), P50 sobrestima.
+
+**Decisión.** NO SE ACEPTA y no se implementa. Un error grande hace que el ojo cerrado real no llegue al P80 (por
+ejemplo, con −0,27 un ojo cerrado del todo marcaría un cierre de ~0,65) y PERCLOS dejaría de detectar cierres. Vías
+para un nuevo intento: exigir más parpadeos (el peor caso tenía 5) o combinar el estimador con una comprobación de
+que la malla registra el cierre.
