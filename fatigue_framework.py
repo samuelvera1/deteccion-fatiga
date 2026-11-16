@@ -52,11 +52,12 @@ class FatigueMonitor(Thresholds):
 
     def __init__(self, video_source=0, subject_id="anonimo", condition=None, save_trace=True, sessions_dir="sesiones",
                  subject_code=None, manual_marks=None, record=False, kss_interval_min=None, alert_sound=True,
-                 refine_landmarks=True, capture_size=(1280, 720),
+                 refine_landmarks=True, capture_size=(1280, 720), headless=False,
                  yawn_factor=1.65, yawn_min_delta=0.25, yawn_min_seconds=0.5,
                  micro_yawn_factor=1.30, micro_yawn_min_delta=0.15, micro_yawn_min_seconds=0.35,
                  calibration_frames=90, window_seconds=60, perclos_min_seconds=15):
         self.video_source = video_source
+        self.headless = headless              # sin ventana ni panel (análisis por lotes): mismas mediciones
         # Cada ejecución de start() crea una sesión en sessions_dir con metadatos reproducibles
         self.subject_id = subject_id
         self.condition = condition            # condición experimental declarada (p. ej. con_gafas)
@@ -403,7 +404,8 @@ class FatigueMonitor(Thresholds):
         if self._is_video_file():
             self.alert.sound = False      # analizando un vídeo: alertas registradas, sin sonido
         # Antes de abrir la cámara (tarda unos segundos): así se ve enseguida que la sesión está empezando
-        window = display.open_window(fatigue_hud.WINDOW_NAME, fatigue_hud.window_size())
+        window = (display.NullWindow() if self.headless
+                  else display.open_window(fatigue_hud.WINDOW_NAME, fatigue_hud.window_size()))
         cap = cv2.VideoCapture(self.video_source)
         frame_size = self._configure_camera(cap)
         native_fps = cap.get(cv2.CAP_PROP_FPS) or None
@@ -456,8 +458,9 @@ class FatigueMonitor(Thresholds):
             if self.kss and self._monitoring_started and self.kss.due(self._now):
                 self._ask_kss("inicio" if not self.kss.responses else "periodica")
 
-            img = self.hud.present(self.hud.render(img, self, is_microsleep_active, is_yawning_active), window)
-            window.show(img)
+            if not self.headless:
+                img = self.hud.present(self.hud.render(img, self, is_microsleep_active, is_yawning_active), window)
+                window.show(img)
             key = window.wait_key(1)
             if key == ord(' ') and self._is_video_file():
                 # Pausa (solo vídeos: el reloj es el del archivo, así que pausar no altera las mediciones)

@@ -39,6 +39,31 @@ class OpenCvWindow:
         cv2.destroyAllWindows()
 
 
+class NullWindow:
+    """Sin ventana (análisis por lotes de vídeos): no muestra nada ni espera teclas."""
+
+    def __init__(self, name=None, size=None):
+        pass
+
+    def show(self, img):
+        pass
+
+    def wait_key(self, ms):
+        return 255
+
+    def is_open(self):
+        return True
+
+    def size(self):
+        return None
+
+    def on_mouse(self, callback):
+        pass
+
+    def close(self):
+        pass
+
+
 _window_class = OpenCvWindow
 
 

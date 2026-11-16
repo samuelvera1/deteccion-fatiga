@@ -75,6 +75,8 @@ def parse_args(argv=None):
                         help="desactiva refine_landmarks de MediaPipe (solo para comparar con el modo anterior)")
     parser.add_argument("--calibracion-auto", action="store_true",
                         help="ignora las marcas de calibración manual del vídeo y calibra automáticamente")
+    parser.add_argument("--sin-ventana", action="store_true",
+                        help="analiza sin mostrar la ventana ni el panel (lotes de vídeos: más rápido, mismas mediciones)")
     args = parser.parse_args(argv)
     args.fuente = int(args.fuente) if args.fuente.isdigit() else args.fuente
     if args.resolucion.lower() == "nativa":
@@ -121,7 +123,8 @@ def run_session(args):
     monitor = FatigueMonitor(video_source=args.fuente, subject_id=args.sujeto, subject_code=subject_code,
                              manual_marks=marks, condition=args.condicion, save_trace=not args.sin_traza,
                              refine_landmarks=not args.sin_refinar, capture_size=args.resolucion,
-                             record=args.grabar, kss_interval_min=args.kss, alert_sound=not args.sin_sonido)
+                             record=args.grabar, kss_interval_min=args.kss, alert_sound=not args.sin_sonido,
+                             headless=args.sin_ventana)
     monitor.on_blink(registrar_parpadeo)
     monitor.on_yawn(registrar_bostezo)
     monitor.start()
