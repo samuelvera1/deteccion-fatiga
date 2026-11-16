@@ -24,6 +24,7 @@ class EyeEventDetector(Thresholds):
         self.long_blink_count = 0             # parpadeos prolongados (>= LONG_BLINK_SECONDS, sin micro-sueño)
         self.blink_durations = []             # duración (s) de cada parpadeo normal y prolongado
         self.fast_turn_rejected = 0           # caídas de apertura descartadas por giro rápido de cabeza
+        self.shallow_rejected = 0             # caídas de apertura descartadas por poco profundas
         self._last_microsleep_log = 0.0
         self.reset()
 
@@ -41,6 +42,7 @@ class EyeEventDetector(Thresholds):
         self.blink_split = None               # reapertura parcial pendiente dentro de una ráfaga
         self.blink_in_burst = False           # el cierre en curso empezó en una reapertura parcial (ráfaga)
         self.blink_ref = None
+        self.blink_start_ref = None           # referencia local al empezar el parpadeo en curso (profundidad)
         self._ear_history = deque()           # (t, apertura) del último segundo, para la referencia local
         self._last_blink_ref = None
         self.blink_max_head_speed = 0.0       # giro de cabeza máximo (°/s) durante el cierre en curso
@@ -79,6 +81,7 @@ class EyeEventDetector(Thresholds):
                 self.blink_dip, self.blink_started, self.blink_had_microsleep = ear, now, False
                 self.blink_peak_seen, self.blink_split, self.blink_in_burst = False, None, False
                 self.blink_max_head_speed = 0.0
+                self.blink_start_ref = ref
             self.blink_dip = min(self.blink_dip, ear)
             self.blink_max_head_speed = max(self.blink_max_head_speed, self.head.speed or 0.0)
             self.blink_closed_frames += 1
@@ -116,6 +119,7 @@ class EyeEventDetector(Thresholds):
             self.blink_started, self.blink_closed_frames = split_t, frames_after + 1
             self.blink_dip, self.blink_peak_seen, self.blink_split = min(dip_after, ear), True, None
             self.blink_in_burst = True
+            self.blink_start_ref = ref
         else:
             self.blink_split[3], self.blink_split[4] = frames_after + 1, min(dip_after, ear)
 
@@ -137,6 +141,12 @@ class EyeEventDetector(Thresholds):
             # caída de apertura durante un giro rápido de cabeza sin cierre real del párpado
             self.fast_turn_rejected += 1
             self._log_event("PARPADEO_DESCARTADO_GIRO", ear, duration, end_time=end_time)
+            return
+        start_ref = self.blink_start_ref or ref
+        if start_ref and 1.0 - dip / start_ref < self.BLINK_MIN_DEPTH:
+            # caída de apertura poco profunda (mirada, gesto, ruido de la malla): no es un parpadeo
+            self.shallow_rejected += 1
+            self._log_event("PARPADEO_DESCARTADO_PROFUNDIDAD", ear, duration, end_time=end_time)
             return
         # end_time: en una ráfaga, el parpadeo termina en la reapertura parcial (anterior al frame actual);
         # registrarlo en el frame actual desplazaba su intervalo [t_s - duración, t_s] unas décimas

@@ -40,6 +40,7 @@ def session_parameters(monitor):
                  "parpadeo_margen_1_frame": monitor.BLINK_DEEP_MARGIN,
                  "parpadeo_ventana_ref_s": monitor.BLINK_REF_WINDOW,
                  "parpadeo_percentil_ref": monitor.BLINK_REF_PERCENTILE,
+                 "parpadeo_profundidad_min": monitor.BLINK_MIN_DEPTH,
                  "parpadeo_min_frames": monitor.MIN_BLINK_FRAMES,
                  "parpadeo_prolongado_min_s": monitor.LONG_BLINK_SECONDS,
                  "parpadeo_prolongado_cierre_min": monitor.LONG_BLINK_MIN_CLOSURE,
@@ -124,6 +125,7 @@ def session_summary(monitor):
         "duracion_media_bostezo_s": (round(float(np.mean(monitor.yawn.durations)), 4)
                                      if monitor.yawn.durations else None),
         "parpadeos_descartados_giro": monitor.eyes.fast_turn_rejected,
+        "parpadeos_descartados_profundidad": monitor.eyes.shallow_rejected,
         "sonrisas_descartadas": monitor.yawn.smile_count,
         "tiempo_postura_fuera_de_rango_s": round(monitor.head.out_time, 2),
         "perclos_final_pct": round(monitor.perclos_val, 2),

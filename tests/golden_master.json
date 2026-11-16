@@ -1,12 +1,12 @@
 {
  "sesiones/20261017_114229_Samuel_Vera/grabacion.mp4": {
-  "eventos_sha256": "50eaac17de786e6e5397c8ad65b55e518693c6b5eea295974faa59d2fa0479e0",
-  "parametros_sha256": "26698eec1f8666a8f06c2cec223060efdb53add9530c3de826d85b030560e89c",
+  "eventos_sha256": "1d096ed48c672362099460b4fecba59a69fc489f78c08417aca14f8176c6f47b",
+  "parametros_sha256": "1a5fce8867dc0e04422f8a3a5bd1a3ee8bc37f20752d9bad81cd2d10d2b21399",
   "resumen": {
    "bostezos": 3,
    "calibracion_modo": "automatica",
    "duracion_media_bostezo_s": 2.2889,
-   "duracion_media_parpadeo_s": 0.25,
+   "duracion_media_parpadeo_s": 0.2545,
    "duracion_s": 44.07,
    "fatiga": {
     "alertas": {
@@ -33,26 +33,27 @@
    "ojo_cerrado_proporcion": 0.5487093861365405,
    "ojo_cerrado_ref": 0.05085332262555634,
    "ojo_cerrado_reutilizado_en_recalibracion": false,
-   "parpadeos": 11,
+   "parpadeos": 10,
    "parpadeos_descartados_giro": 1,
+   "parpadeos_descartados_profundidad": 1,
    "parpadeos_prolongados": 1,
    "paso_ojos_cerrados_apertura_min_ratio": 0.5180562621716458,
    "perclos_final_pct": 2.67,
-   "proporcion_parpadeos_prolongados": 0.0833,
+   "proporcion_parpadeos_prolongados": 0.0909,
    "recalibraciones": 0,
    "sonrisas_descartadas": 0,
    "tiempo_postura_fuera_de_rango_s": 1.47
   },
-  "traza_sha256": "20eb98a74b373a466440de11a02204ba3366975946cc57ac46a46df0c8e80dd8"
+  "traza_sha256": "d091ba0fca569fc66b6fdd16630b5d5ffac5ba037cf7cc5a1cc02f71161edf30"
  },
  "sesiones/20261017_120014_Samuel_Vera/grabacion.mp4": {
-  "eventos_sha256": "cf51c49dedeb9fe4fac88bb31f78198238a663e4f7d5267ea10277498e9e1503",
-  "parametros_sha256": "26698eec1f8666a8f06c2cec223060efdb53add9530c3de826d85b030560e89c",
+  "eventos_sha256": "8c6b278357be0964ca9cefc8c21166ab4b84482c10205bd1918401454f7e5269",
+  "parametros_sha256": "1a5fce8867dc0e04422f8a3a5bd1a3ee8bc37f20752d9bad81cd2d10d2b21399",
   "resumen": {
    "bostezos": 2,
    "calibracion_modo": "automatica",
    "duracion_media_bostezo_s": 2.1833,
-   "duracion_media_parpadeo_s": 0.15,
+   "duracion_media_parpadeo_s": 0.1556,
    "duracion_s": 22.73,
    "fatiga": {
     "alertas": {
@@ -79,8 +80,9 @@
    "ojo_cerrado_proporcion": 0.5355829803818222,
    "ojo_cerrado_ref": 0.05086216520759637,
    "ojo_cerrado_reutilizado_en_recalibracion": false,
-   "parpadeos": 4,
+   "parpadeos": 3,
    "parpadeos_descartados_giro": 0,
+   "parpadeos_descartados_profundidad": 1,
    "parpadeos_prolongados": 0,
    "paso_ojos_cerrados_apertura_min_ratio": 0.47610448920971205,
    "perclos_final_pct": 0.4,
@@ -89,16 +91,16 @@
    "sonrisas_descartadas": 0,
    "tiempo_postura_fuera_de_rango_s": 0.0
   },
-  "traza_sha256": "4479233cc09c24c2b9a448e9739bb3bc1848f4b8180e17838f6e204f79d106d2"
+  "traza_sha256": "832353f4051eb5fd4a7b4003d8dc7d9bc6f29029f01c12b18d711b06bd304f66"
  },
  "sesiones/20261017_120716_Samuel_Vera/grabacion.mp4": {
-  "eventos_sha256": "bc81dd46edb3d2c2bd66f8828887eb52583e0095cc571b63d6109889f2569996",
-  "parametros_sha256": "26698eec1f8666a8f06c2cec223060efdb53add9530c3de826d85b030560e89c",
+  "eventos_sha256": "5d2270f87399cb465c489b8e8694843e495d729eb5c54eb932acbd11c5a83dc6",
+  "parametros_sha256": "1a5fce8867dc0e04422f8a3a5bd1a3ee8bc37f20752d9bad81cd2d10d2b21399",
   "resumen": {
    "bostezos": 1,
    "calibracion_modo": "automatica",
    "duracion_media_bostezo_s": 2.2,
-   "duracion_media_parpadeo_s": 0.3,
+   "duracion_media_parpadeo_s": 0.4,
    "duracion_s": 30.73,
    "fatiga": {
     "alertas": {
@@ -125,16 +127,17 @@
    "ojo_cerrado_proporcion": 0.4797485210318466,
    "ojo_cerrado_ref": 0.043579161569913864,
    "ojo_cerrado_reutilizado_en_recalibracion": false,
-   "parpadeos": 5,
+   "parpadeos": 3,
    "parpadeos_descartados_giro": 0,
+   "parpadeos_descartados_profundidad": 3,
    "parpadeos_prolongados": 1,
    "paso_ojos_cerrados_apertura_min_ratio": 0.43747293714327307,
    "perclos_final_pct": 0.27,
-   "proporcion_parpadeos_prolongados": 0.1667,
+   "proporcion_parpadeos_prolongados": 0.25,
    "recalibraciones": 0,
    "sonrisas_descartadas": 0,
    "tiempo_postura_fuera_de_rango_s": 0.0
   },
-  "traza_sha256": "5d0707eddf1c0cd3e4abb0baca4032e6028bcb9f28d055b1844167f044b574d0"
+  "traza_sha256": "80ef0651f398e9dee85037ed5da0526e851afcb907f0bc51945be3ba9f247830"
  }
 }

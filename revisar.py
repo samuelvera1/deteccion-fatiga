@@ -998,6 +998,7 @@ class SessionReviewer(Viewer):
                 ("Prolongado", ui.EVENT_COLORS["PARPADEO_PROLONGADO"]), ("Bostezo", ui.EVENT_COLORS["BOSTEZO"]),
                 ("Micro-bostezo", ui.EVENT_COLORS["MICRO_BOSTEZO"]), ("Micro-sueño", ui.EVENT_COLORS["MICRO_SUENO"]),
                 ("Sonrisa", ui.EVENT_COLORS["SONRISA"]), ("Giro rápido", ui.EVENT_COLORS["PARPADEO_DESCARTADO_GIRO"]),
+                ("Poco profundo", ui.EVENT_COLORS["PARPADEO_DESCARTADO_PROFUNDIDAD"]),
                 ("Problema", ui.EVENT_COLORS["PROBLEMA"])]
 
     def draw_static_rows(self, c, rows, width):

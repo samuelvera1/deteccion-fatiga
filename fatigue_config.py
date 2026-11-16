@@ -103,6 +103,13 @@ class Thresholds:
     BLINK_DEEP_MARGIN = 0.10        # 1 solo frame cuenta si baja de (0.79 - 0.10) x referencia local
     BLINK_REF_WINDOW = (0.9, 0.3)   # s antes del frame actual que forman la referencia local
     BLINK_REF_PERCENTILE = 90
+    # PROFUNDIDAD MÍNIMA: un parpadeo cuenta si la apertura baja al menos un 30 % de la referencia local que había al
+    # empezar (1 - mínimo / referencia >= 0.30). Experimento E2 (docs/registro_experimentos.md), ajustado en
+    # Eyeblink8 con validación cruzada por video: FP 64 -> 14 y FN 62 -> 71 (F1 0.83 -> 0.88). NO cumplía el criterio
+    # acordado (los FN subieron); se adoptó por decisión del autor. Entre los dos valores que eligió la validación
+    # cruzada (0.30 y 0.40, F1 igual) se tomó 0.30 porque con gafas el 35 % de los parpadeos propios bajan menos de
+    # 0.40. PROVISIONAL: pendiente de probar con datos nuevos.
+    BLINK_MIN_DEPTH = 0.30
 
     # Bostezo de dos niveles. Cada nivel exige que la boca supere su umbral de forma sostenida
     # (huecos de hasta YAWN_GAP_FRAMES frames no cortan la racha: tics de labios). Un episodio

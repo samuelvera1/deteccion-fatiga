@@ -32,7 +32,8 @@ CLASSES = ("parpadeo", "bostezo", "cierre_largo")
 SYSTEM_TYPES = {"PARPADEO": "parpadeo", "PARPADEO_PROLONGADO": "parpadeo",
                 "BOSTEZO": "bostezo", "MICRO_BOSTEZO": "bostezo"}
 # Eventos que el sistema descartó a propósito: se cruzan con la referencia para estimar el efecto de la regla
-DISCARD_TYPES = {"PARPADEO_DESCARTADO_GIRO": "parpadeo", "SONRISA": "bostezo"}
+DISCARD_TYPES = {"PARPADEO_DESCARTADO_GIRO": "parpadeo", "PARPADEO_DESCARTADO_PROFUNDIDAD": "parpadeo",
+                 "SONRISA": "bostezo"}
 REFERENCE_TYPES = {"PARPADEO": "parpadeo", "BOSTEZO": "bostezo", "MICRO_BOSTEZO": "bostezo",
                    "MICRO_SUENO": "cierre_largo"}
 TOLERANCE_S = {"parpadeo": 0.10, "bostezo": 0.0, "cierre_largo": 0.0}   # guía, sección 4 (borrador)

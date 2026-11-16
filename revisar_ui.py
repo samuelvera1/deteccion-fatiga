@@ -30,12 +30,13 @@ EVENT_COLORS = {
     "PARPADEO": (70, 190, 255), "PARPADEO_PROLONGADO": (52, 112, 255),
     "BOSTEZO": (255, 210, 70), "MICRO_BOSTEZO": (226, 150, 52),
     "MICRO_SUENO": (238, 88, 88), "SONRISA": (206, 116, 255),
-    "PARPADEO_DESCARTADO_GIRO": (118, 122, 134),
+    "PARPADEO_DESCARTADO_GIRO": (118, 122, 134), "PARPADEO_DESCARTADO_PROFUNDIDAD": (150, 140, 120),
     "NO_EVALUABLE": (118, 122, 134), "PROBLEMA": (255, 128, 60),
 }
 SYSTEM_LABELS = {"PARPADEO": "Parpadeo", "PARPADEO_PROLONGADO": "Parpadeo prolongado", "BOSTEZO": "Bostezo",
                  "MICRO_BOSTEZO": "Micro-bostezo", "MICRO_SUENO": "Micro-sueño", "SONRISA": "Sonrisa (descartada)",
-                 "PARPADEO_DESCARTADO_GIRO": "Descartado por giro"}
+                 "PARPADEO_DESCARTADO_GIRO": "Descartado por giro",
+                 "PARPADEO_DESCARTADO_PROFUNDIDAD": "Descartado por poco profundo"}
 ANNOTATION_LABELS = {"PARPADEO": "Parpadeo", "BOSTEZO": "Bostezo", "MICRO_BOSTEZO": "Micro-bostezo",
                      "MICRO_SUENO": "Cierre largo", "NO_EVALUABLE": "No evaluable", "PROBLEMA": "Problema"}
 STATE_COLORS = {"midiendo": (64, 150, 96), "calibrando": (88, 92, 104), "marcas": (70, 112, 170),
