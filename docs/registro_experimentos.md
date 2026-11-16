@@ -292,3 +292,27 @@ los datos anotados disponibles, el detector de parpadeos está cerca de su techo
 validación cruzada). Los errores restantes requieren datos nuevos (inclinaciones controladas propias, un segundo
 anotador, otro conjunto público), no más búsqueda. E5b (fuera de rango, solo parpadeos cortos) se estimó a partir de
 los recuentos de E5: perdería 7 aciertos y quitaría 4 FP (F1 ≈ 0,944 < 0,949), así que no se ejecuta.
+
+---
+
+## E7 — Apertura del ojo normalizada por el diámetro vertical del iris (2026-11-16)
+
+**Motivación.** La apertura actual divide la distancia vertical entre párpados por la IPD, que es horizontal: al
+inclinar la cabeza la apertura se acorta en la imagen y la IPD no, de modo que el ojo parece cerrarse (E1, sesión
+piloto con 3 parpadeos prolongados falsos). Además, PERCLOS se definió como la cobertura de la pupila por el párpado.
+
+**Hipótesis.** El diámetro vertical del iris (puntos de iris del modelo refinado de MediaPipe, ya calculados y sin
+usar) está en el mismo plano que la abertura del párpado y se acorta igual con el cabeceo. La razón abertura / diámetro
+vertical del iris es más estable con la postura y mide directamente cuánto del iris tapa el párpado.
+
+**Datos.** Desarrollo: 19 sesiones grabadas propias (postura) y las 9 grabaciones con parpadeos anotados (8 de
+Eyeblink8 y la piloto propia). Señales reextraídas con la misma configuración de MediaPipe.
+
+**Criterio (fijado antes de extraer).**
+- C1 (postura, sesiones propias): mediana del |cierre aparente| en los tramos de |cabeceo| de 10-15°, 15-20° y
+  20-30° al menos un 50 % menor que con la apertura actual (normalizada por la IPD), en el total de cuadros de esos
+  tramos.
+- C2 (parpadeos, simulador con la configuración E5): F1 en las 9 grabaciones anotadas no menor que el actual menos
+  0,01. Se informa la sesión piloto por separado.
+- Se adopta si cumple C1 y C2. El grado de cierre (PERCLOS, micro-sueño) se recalibraría con la nueva señal; su
+  validación queda para DROZY.
