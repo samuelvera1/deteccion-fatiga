@@ -401,3 +401,30 @@ cuadros alrededor de cada parpadeo, porque un cierre ≥ 80 % sin llegar al 100 
 
 **Alcance.** Valida la medida de cierre por cuadro y su suma en personas alertas (PERCLOS bajos, del orden de pocos
 puntos). No valida el PERCLOS con somnolencia real (cierres lentos, párpado caído) ni los umbrales de 8 % y 12 %.
+
+**Resultado.** 62 179 cuadros evaluables: 1 440 positivos, 57 830 negativos y 2 909 intermedios. La sensibilidad por
+desfase es máxima en 0 cuadros (0,88 frente a 0,75 con ±1), así que traza y anotación están alineadas.
+- Nivel principal (proporción de los otros 7 videos: 0,285 o 0,304):
+  - C1: sensibilidad 0,878 (IC 95 % 0,861-0,894; 1 265/1 440). **Cumple.**
+  - C2: falsos positivos 0,06 % (IC 95 % 0,04-0,09 %; 36/57 830). **Cumple.**
+  - C3: 24 de 24 ventanas dentro del intervalo. **Cumple.** Bland-Altman frente a los cuadros totalmente cerrados: sesgo
+    +0,08 puntos, límites de acuerdo −0,87 a +1,03 puntos. PERCLOS de referencia por ventana entre 0,06 % y 6,48 %
+    (mediana 1,68 %). Las 24 ventanas vienen de 7 videos: el 3 no tiene ninguna con 54 s evaluables y el 11 aporta una.
+  - Intermedios con cierre ≥ 0,80: 116 de 2 909.
+- Por video, la sensibilidad baja en el 11 (con gafas): 0,45. Su proporción propia es 0,435, frente a 0,23-0,34 en los
+  demás. Con su propia proporción (techo) sube a 0,94. Los videos 3 y 4 quedan cerca de 0,7 incluso con el techo: en
+  algunos cuadros que la persona anotó como cerrados la malla no llega al cierre completo.
+- Reserva 0,25 (no decide): sensibilidad 0,835, falsos positivos 0,04 %, 23/24 ventanas, sesgo −0,07 puntos. En el
+  video 11 la sensibilidad es 0,23.
+- Techo circular (no decide): sensibilidad 0,913, falsos positivos 0,07 %, 24/24 ventanas, límites −0,51 a +0,82 puntos.
+
+**Decisión.** SE VALIDA el estado por cuadro de PERCLOS en personas alertas: con un nivel de ojo cerrado razonable,
+detecta casi 9 de cada 10 cuadros con los ojos totalmente cerrados, casi no marca cuadros abiertos y el PERCLOS por
+minuto difiere de la referencia en menos de ±1 punto. Dos límites:
+- C3 resultó poco exigente con PERCLOS tan bajos: si la referencia es menor de 1 %, el límite inferior es negativo. El
+  dato informativo es el de Bland-Altman.
+- El caso con gafas muestra que una proporción general no sirve para todas las personas. Respalda C1 y que el sistema
+  avise «ojo cerrado no medido» en lugar de usar la reserva.
+
+Queda por validar PERCLOS en somnolencia real y alrededor de los umbrales: videos propios con cierres largos anotados
+o un conjunto con PERCLOS alto.
