@@ -5,6 +5,23 @@ resultado (aunque sea negativo) y la decisión (guía de anotación, sección 7)
 
 ---
 
+## Correcciones de implementación (sin experimento: el sistema medía algo que por definición no debía medir)
+
+**C1 — El paso de ojos cerrados aceptaba parpadeos como "ojo cerrado medido" (2026-11-16).** Durante los 10 s del
+paso, los cuadros de los parpadeos espontáneos (apertura < 0,6 × abierta, 3-8 cuadros cada uno) se acumulaban, y
+con 10 o más el nivel de ojo cerrado quedaba "medido" a medio cerrar. Con ese nivel, cualquier bajada de la mirada
+superaba el 80 % de cierre: alertas falsas (RLDD 05 somnoliento, 53 s de micro-sueño; el panel marcaba SOMNOLENCIA
+en videos de personas alerta). Evidencia en las trazas: 7 de 21 videos sin paso de cierre (Eyeblink8 2 y 10; RLDD 04
+poco alerta, 04 somnoliento, 06 alerta, 06 somnoliento, 05 somnoliento) con proporción cerrado/abierto de 0,23-0,55, y
+2 sesiones en vivo en las que no hubo cierre real (20261017_131950: el ojo quedó al 70-80 %; 20261109_090009: ojos
+abiertos). Corrección: solo cuentan los cuadros de un cierre sostenido de ≥ 0,5 s seguidos (huecos de hasta 2
+cuadros), más largo que cualquier parpadeo normal (0,13-0,43 s). Simulada sobre las trazas: en esos 9 casos el ojo
+cerrado pasa a "no medido" (el sistema lo advierte en vez de dar alertas) y en las otras 17 sesiones en vivo se sigue
+midiendo. Pruebas: tests/test_fatigue_profile.py. No afecta a E4b, que se procesa con una copia congelada del código
+(commit 1217023).
+
+---
+
 ## E1 — Apertura ocular en 3D para evitar el cierre aparente al inclinar la cabeza (2026-11-16)
 
 **Motivación.** En la validación externa con Eyeblink8 (commit edb9ec9 + cambios solo de interfaz, luego abcd056),

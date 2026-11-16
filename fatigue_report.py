@@ -27,6 +27,7 @@ def session_parameters(monitor):
                         "intentos_ojo_cerrado_en_vivo": monitor.CLOSED_MAX_ATTEMPTS,
                         "pausa_entre_intentos_s": monitor.CLOSED_RETRY_PAUSE,
                         "reserva_ojo_cerrado_ratio": monitor.CLOSED_FALLBACK_RATIO,
+                        "ojo_cerrado_sostenido_min_s": monitor.CLOSED_MIN_SUSTAINED_S,
                         "cierre_visible_max_ratio": monitor.CLOSURE_VISIBLE_MAX_RATIO,
                         "reapertura_cierre_max": monitor.REOPEN_MAX_CLOSURE,
                         "reapertura_frames": monitor.REOPEN_FRAMES,

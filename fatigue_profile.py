@@ -150,6 +150,42 @@ class SubjectProfile:
 
 
 
+class SustainedClosureFilter:
+    """Paso de ojos cerrados: deja pasar solo los cuadros de un cierre sostenido (al menos min_seconds seguidos bajo
+    el umbral, con huecos de hasta gap_frames cuadros), no los de los parpadeos espontáneos."""
+
+    def __init__(self, min_seconds, gap_frames):
+        self.min_seconds = min_seconds
+        self.gap_frames = gap_frames
+        self.reset()
+
+    def reset(self):
+        self._pending = []
+        self._start = None
+        self._gap = 0
+        self._sustained = False
+
+    def update(self, ear, below, now):
+        """Devuelve las aperturas que pasan a contar como ojo cerrado (al confirmarse el cierre, las del tramo)."""
+        if not below:
+            if self._start is not None and self._gap < self.gap_frames:
+                self._gap += 1
+                return []
+            self.reset()
+            return []
+        self._gap = 0
+        if self._start is None:
+            self._start = now
+        if self._sustained:
+            return [ear]
+        self._pending.append(ear)
+        if now - self._start >= self.min_seconds:
+            self._sustained = True
+            released, self._pending = self._pending, []
+            return released
+        return []
+
+
 class LandmarkStabilityGate:
     """
     Puerta de estabilidad de landmarks: el rostro debe estar quieto durante la calibración.

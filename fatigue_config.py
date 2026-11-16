@@ -17,6 +17,13 @@ class Thresholds:
     CLOSED_MAX_ATTEMPTS = 3
     CLOSED_RETRY_PAUSE = 3.0
     CLOSED_FALLBACK_RATIO = 0.25
+    # Solo cuentan los cuadros de un CIERRE SOSTENIDO: >= CLOSED_MIN_SUSTAINED_S seguidos bajo el umbral (huecos de
+    # hasta CLOSED_GAP_FRAMES cuadros). Sin esto, los parpadeos espontáneos del paso (3-8 cuadros cada uno) se juntaban
+    # como "ojo cerrado medido" a medio cerrar: en 7 de 21 videos sin paso de cierre (Eyeblink8, UTA-RLDD) y en 2
+    # sesiones en vivo sin cierre real (20261017_131950, 20261109_090009), con alertas falsas (RLDD 05 somnoliento:
+    # 53 s de micro-sueño). 0,5 s supera la duración de los parpadeos normales (0,13-0,43 s, ver LONG_BLINK_SECONDS).
+    CLOSED_MIN_SUSTAINED_S = 0.5
+    CLOSED_GAP_FRAMES = 2
     # Si con los ojos cerrados la apertura no baja de este nivel, el cierre apenas es visible en la malla
     CLOSURE_VISIBLE_MAX_RATIO = 0.6
     # Reapertura tras el paso de ojos cerrados: el monitoreo empieza cuando el cierre baja de

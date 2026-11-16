@@ -1,7 +1,7 @@
 {
  "sesiones/20261017_114229_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "fb4ac18180ee98a8e58d1ecd84e912a8a14593422c5b3c6dba5d327736447a1a",
-  "parametros_sha256": "94b299442d5a753d8b81560ea992ac93d6698070a4eb78ad7810eec2f04e4d16",
+  "parametros_sha256": "cff3288ad05c9999605279aeaac260a18cb609994ee43320590d9ead89a9085d",
   "resumen": {
    "bostezos": 3,
    "calibracion_modo": "automatica",
@@ -48,7 +48,7 @@
  },
  "sesiones/20261017_120014_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "8c6b278357be0964ca9cefc8c21166ab4b84482c10205bd1918401454f7e5269",
-  "parametros_sha256": "94b299442d5a753d8b81560ea992ac93d6698070a4eb78ad7810eec2f04e4d16",
+  "parametros_sha256": "cff3288ad05c9999605279aeaac260a18cb609994ee43320590d9ead89a9085d",
   "resumen": {
    "bostezos": 2,
    "calibracion_modo": "automatica",
@@ -95,7 +95,7 @@
  },
  "sesiones/20261017_120716_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "5d2270f87399cb465c489b8e8694843e495d729eb5c54eb932acbd11c5a83dc6",
-  "parametros_sha256": "94b299442d5a753d8b81560ea992ac93d6698070a4eb78ad7810eec2f04e4d16",
+  "parametros_sha256": "cff3288ad05c9999605279aeaac260a18cb609994ee43320590d9ead89a9085d",
   "resumen": {
    "bostezos": 1,
    "calibracion_modo": "automatica",

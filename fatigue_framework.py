@@ -17,7 +17,7 @@ from fatigue_core import FaceMeshDetector
 from fatigue_eyes import EyeEventDetector
 from fatigue_perclos import PerclosWindow
 from fatigue_pose import HeadPoseTracker
-from fatigue_profile import LandmarkStabilityGate, SubjectProfile
+from fatigue_profile import LandmarkStabilityGate, SubjectProfile, SustainedClosureFilter
 from fatigue_yawn import YawnDetector
 from kss import KSSPrompter
 from session_recorder import FrameRecorder, SessionRecorder
@@ -108,6 +108,7 @@ class FatigueMonitor(Thresholds):
         self.ipd = None
         # Gafas según la condición declarada: True / False, o None si no se declaró
         self.has_glasses = self._declared_glasses(condition)
+        self._closed_run = SustainedClosureFilter(self.CLOSED_MIN_SUSTAINED_S, self.CLOSED_GAP_FRAMES)
         self._reset_tracking_state()
 
         self.recalibration_count = 0
@@ -152,6 +153,7 @@ class FatigueMonitor(Thresholds):
     def _reset_tracking_state(self):
         self.eyes.reset()
         self.yawn.reset()
+        self._closed_run.reset()
         self._closed_phase_started = None
         self._closed_attempt = 1              # intento actual del paso de ojos cerrados
         self._closed_retry_until = None       # fin de la pausa antes del siguiente intento
@@ -319,9 +321,12 @@ class FatigueMonitor(Thresholds):
             if self._closed_phase_started is None:
                 self._closed_phase_started = now
             self.profile.observe_closed_phase(ear)
+            below = ear < self.profile.open_ear_baseline * self.CLOSED_CAPTURE_FACTOR
             done = False
-            if ear < self.profile.open_ear_baseline * self.CLOSED_CAPTURE_FACTOR:
-                done = self.profile.add_closed_sample(ear)
+            for sample in self._closed_run.update(ear, below, now):
+                done = self.profile.add_closed_sample(sample)
+                if done:
+                    break
             timed_out = not done and now - self._closed_phase_started > self.CLOSED_CALIBRATION_TIMEOUT
             if (timed_out and not self.profile.closed_samples_enough() and not self._is_video_file()
                     and self._closed_attempt < self.CLOSED_MAX_ATTEMPTS):
@@ -329,6 +334,7 @@ class FatigueMonitor(Thresholds):
                 # (con la reserva, PERCLOS, micro-sueño y alertas no funcionan; sesión 20261017_111619)
                 self._closed_attempt += 1
                 self.profile.restart_closed_phase()
+                self._closed_run.reset()
                 self._closed_retry_until = now + self.CLOSED_RETRY_PAUSE
                 fatigue_audio.retry_beep()
                 print(f"[PASO 2] No se detectaron los ojos cerrados: intento {self._closed_attempt} de "
