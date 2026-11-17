@@ -787,3 +787,48 @@ Según el criterio de E10, la grabación a 45° se repite una vez. Si vuelve a f
 sistema no es utilizable. Para esa repetición, la guía ya no pide pulsar Q cuando falla la medida del ojo cerrado en
 los videos de lado: pide seguir con el guion. Así queda el video completo para probar sin conexión la variante
 pre-registrada en E10 (usar solo el ojo cercano), con calibración manual por marcas.
+
+## E14 — Rehacer la referencia cuando la postura cambia de forma sostenida (criterio fijado el 2026-11-16, antes de simular)
+
+**Motivación.**
+- En UTA-RLDD, con los límites actuales (abajo 10°, arriba 15°, giro 40°), salen fuera de rango sobre todo cinco
+  videos: 02_0 (72 %), 02_10 (60 %), 04_10 (50 %), 05_10 (44 %) y 04_0 (17 %).
+- Las personas están sentadas de forma natural. Lo que falla es la referencia, de dos maneras:
+  - la calibración automática se tomó en un momento atípico: en 05_10, desde el primer minuto la cabeza ya está 17°
+    más arriba que en la calibración;
+  - la persona se acomodó después de calibrar: en 02_0 y 04_10 pasa de 0-8° a 11-13° hacia abajo y se queda así
+    durante minutos.
+- En uso real también pasa: la persona calibra y, al rato, cambia de postura.
+
+**Hipótesis.** Si la postura sale de rango y se queda quieta en la nueva posición al menos 20 s, rehacer ahí la
+referencia de postura y la apertura del ojo abierto recupera ese tiempo para PERCLOS sin añadir cierres falsos.
+
+**Regla simulada** (sobre las trazas, sin volver a procesar los videos).
+- Disparo: los últimos 20 s están todos fuera de rango respecto a la referencia vigente, con desviación típica del
+  cabeceo y del giro ≤ 4° (postura quieta).
+- Nueva referencia: la mediana del cabeceo y del giro de esos 20 s. Se aproxima restando ángulos, válido para los
+  ángulos de este caso.
+- Nueva apertura del ojo abierto: la mediana de la apertura en esos 20 s, solo con los cuadros a ≥ 0,75 de su
+  percentil 90 (quita los parpadeos).
+- El nivel de ojo cerrado conserva su proporción respecto al abierto.
+- Tope: solo se rehace si la nueva postura queda dentro de |cabeceo| ≤ 30° y |giro| ≤ 40° respecto a la calibración
+  original. Más allá la malla no es fiable (E10).
+- No es retroactiva y puede repetirse.
+- Para el estado de ojo cerrado en UTA-RLDD (sin calibración de ojo cerrado) se usa la proporción poblacional de
+  Eyeblink8: 0,2945, la mediana de E8.
+
+**Criterio (se adopta si se cumplen los tres).**
+- (1) En UTA-RLDD (23 videos), la disponibilidad media de la alerta (ventana con ≥ 54 s válidos) sube al menos 10
+  puntos.
+- (2) En los videos alerta (etiqueta 0) de UTA-RLDD, la fracción de tiempo con cierre ≥ 0,80:
+  - en los cuadros que E14 vuelve válidos no supera a la de los cuadros válidos en las dos versiones en más de 2
+    puntos (sumando todos los videos);
+  - hacen falta al menos 60 s de cuadros recuperados; con menos no se adopta.
+- (3) En Eyeblink8 (anotación por cuadro), con E14 se siguen cumpliendo falsos positivos ≤ 1 % y sensibilidad ≥
+  0,80 en todos los cuadros válidos.
+
+**Se informan sin que decidan.**
+- Cuántas veces se rehace la referencia por video.
+- La diferencia de PERCLOS entre el video somnoliento y el alerta de cada persona, con y sin E14. Riesgo conocido:
+  rehacer la apertura del ojo abierto con una persona ya somnolienta subestimaría PERCLOS. La regla solo actúa
+  cuando la postura sale de rango, no dentro de él.
