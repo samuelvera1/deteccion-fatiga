@@ -48,31 +48,42 @@ def _hold(t, seconds, start, end):
     return [(t, start), (t + seconds, end)]
 
 
+def _look(t, start, blink_at=2.5, back_at=4.0):
+    """Mirar a un lado (girando la cabeza o solo con los ojos), parpadear ahí y volver al frente."""
+    return [(t, start), (t + blink_at, LOOK_BLINK), (t + back_at, "Al frente.")]
+
+
 # Parpadeos dirigidos del minuto 1: eventos conocidos para comprobar el conteo de parpadeos
 BLINK_CUES = ("Haz un parpadeo.", "Otro parpadeo.", "Uno más.")
 TRIPLE_BLINK = "Tres parpadeos seguidos."
+# Parpadeo mirando a un lado: comprueba el conteo con la cabeza girada y con la mirada lateral (otro monitor)
+LOOK_BLINK = "Parpadea."
+HEAD_TURNS = ("Gira un poco a la izquierda.", "Gira un poco a la derecha.")
+EYES_ONLY = ("Mira a la derecha, solo con los ojos.", "Mira a la izquierda, solo con los ojos.")
 
 # (segundo desde el inicio del conteo, texto hablado). Las trampas que pueden sacar la postura de rango (celular,
-# giros) van repartidas, como mucho 3 s por minuto, para que cada ventana conserve los 54 s válidos que exige PERCLOS.
+# giros) van repartidas, como mucho 4 s por minuto, para que cada ventana conserve los 54 s válidos que exige PERCLOS.
 SCRIPT = sorted(
     # Minuto 1 (~2-4 %): parpadeos dirigidos (5 sueltos y 2 series de 3), sin cierres; trampas: entrecerrar 5 s y
-    # girar un poco a la izquierda 3 s
+    # girar un poco a la izquierda 4 s, parpadeando ahí
     [(0.0, "Arrancamos. Minuto uno: parpadeos. Haz lo que te diga, con la cabeza quieta.")]
     + [(7.0, BLINK_CUES[0]), (11.0, BLINK_CUES[1]), (15.0, BLINK_CUES[2]), (19.0, TRIPLE_BLINK)]
     + [(26.0, "Ahora, una trampa.")] + _hold(28.0, 5.0, *SQUINT)
     + [(36.0, BLINK_CUES[0])]
-    + _hold(40.0, 3.0, "Gira un poco a la izquierda.", "Al frente.")
+    + _look(40.0, HEAD_TURNS[0])
     + [(46.0, TRIPLE_BLINK), (51.0, BLINK_CUES[0]), (55.0, "Bien. Se vienen los cierres.")]
-    # Minuto 2 (~8-10 %): 3 cierres de 1,5 s y 3 parpadeos lentos; trampa: girar un poco a la derecha 3 s
+    # Minuto 2 (~8-10 %): 3 cierres de 1,5 s y 3 parpadeos lentos; trampa: girar un poco a la derecha 4 s, parpadeando
     + [(60.0, "Minuto dos: cierres cortos. No bajes la cabeza.")]
     + _closure(69.0, 1.5) + _closure(84.0, 1.5) + _closure(107.0, 1.5)
     + [(t, "Parpadeo lento.") for t in (76.0, 91.0, 113.0)]
-    + _hold(96.0, 3.0, "Gira un poco a la derecha.", "Al frente.")
+    + _look(96.0, HEAD_TURNS[1])
     + [(117.0, "Bien hecho.")]
-    # Minuto 3 (~14-16 %): 4 cierres de 2 s; trampas: mirar el celular 3 s y entrecerrar 4 s
+    # Minuto 3 (~14-16 %): 4 cierres de 2 s; trampas: mirar el celular 3 s y entrecerrar 4 s; mirar a cada lado solo
+    # con los ojos, parpadeando ahí
     + [(120.0, "Minuto tres: cierres de dos segundos. Cabeza quieta.")]
     + [c for t in (128.0, 141.0, 154.0, 167.0) for c in _closure(t, 2.0)]
     + _hold(132.0, 3.0, "Mira el celular.", "Vuelve a la pantalla.")
+    + _look(145.0, EYES_ONLY[0], blink_at=3.0, back_at=4.5) + _look(157.0, EYES_ONLY[1], blink_at=3.5, back_at=5.0)
     + _hold(172.0, 4.0, *SQUINT)
     # Minuto 4 (~18-21 %): 2 cierres de 4 s y 1 de 3 s
     + [(180.0, "Último minuto: cierres largos. Aguanta con los ojos cerrados hasta que te diga abre.")]

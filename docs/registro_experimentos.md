@@ -685,3 +685,10 @@ sensibilidad 0,878 y falsos positivos 0,06 %.
   rehacer la referencia, y la apertura del ojo abierto, cuando la postura cambia de forma sostenida.
 - Versiones dentro de E9 y E10: el video con gafas se grabó con la regla anterior (commit 2923ece). Los que faltan se
   graban con esta. El commit queda en los metadatos de cada sesión y los resultados se informan por video.
+
+**Guion v3.1 (2026-11-16, antes de grabar los videos que faltan).** A propuesta de la persona que graba, se añade un
+parpadeo pedido («Parpadea») en cuatro momentos: con la cabeza girada a cada lado (minutos 1 y 2; el giro pasa de
+3 a 4 s) y mirando a cada lado solo con los ojos (minuto 3). Son eventos conocidos para comprobar el conteo de
+parpadeos con la cabeza girada y con la mirada lateral (otro monitor). Se informa cuántos de esos parpadeos cuenta
+el sistema (tramos de `guia_voz.csv`); no decide nada. Lo que puede sacar la postura de rango sigue por debajo de 6 s
+por minuto: como mucho 4 s.

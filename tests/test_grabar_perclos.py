@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import grabar_perclos as g  # noqa: E402
 
-TURNS = (("Gira un poco a la izquierda.", "Al frente."), ("Gira un poco a la derecha.", "Al frente."))
+TURNS = tuple((turn, "Al frente.") for turn in g.HEAD_TURNS)
 PHONE = ("Mira el celular.", "Vuelve a la pantalla.")
 
 
@@ -58,12 +58,23 @@ class GuideScriptTest(unittest.TestCase):
         self.assertEqual((len(slow), {minute(t) for t in slow}), (3, {1}))
         squint = pairs(*g.SQUINT)
         self.assertEqual([(minute(s), e - s) for s, e in squint], [(0, 5.0), (2, 4.0)])
-        # lo que puede sacar la postura de rango (celular, giros) suma como mucho 3 s por minuto: cada ventana conserva
+        # lo que puede sacar la postura de rango (celular, giros) suma como mucho 4 s por minuto: cada ventana conserva
         # los 54 s válidos que exige PERCLOS
         out_of_range = {}
         for s, e in pairs(*PHONE) + [p for turn in TURNS for p in pairs(*turn)]:
             out_of_range[minute(s)] = out_of_range.get(minute(s), 0.0) + e - s
-        self.assertEqual(out_of_range, {0: 3.0, 1: 3.0, 2: 3.0})
+        self.assertEqual(out_of_range, {0: 4.0, 1: 4.0, 2: 3.0})
+
+    def test_blink_while_looking_to_each_side(self):
+        """Un parpadeo girando la cabeza a cada lado y otro mirando a cada lado solo con los ojos."""
+        found = []
+        for start in g.HEAD_TURNS + g.EYES_ONLY:
+            s = next(t for t, text in g.SCRIPT if text == start)
+            e = next(t for t, text in g.SCRIPT if text == "Al frente." and t > s)
+            blinks = [t for t, text in g.SCRIPT if text == g.LOOK_BLINK and s < t < e]
+            self.assertEqual(len(blinks), 1, start)
+            found.append(blinks[0])
+        self.assertEqual(len(found), sum(1 for _, text in g.SCRIPT if text == g.LOOK_BLINK))
 
     def test_cues_fit_and_script_lasts_four_minutes(self):
         times = [t for t, _ in g.SCRIPT]

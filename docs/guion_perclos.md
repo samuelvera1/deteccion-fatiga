@@ -61,12 +61,12 @@ programa mide el ángulo real de la cara respecto a la cámara (`camara_yaw_grad
 
 | Minuto | Qué hace la persona | PERCLOS esperado |
 |---|---|---|
-| 0-1 | Parpadeos dirigidos: «Haz un parpadeo» (5 veces) y «Tres parpadeos seguidos» (2 veces). Trampas: entrecerrar los ojos 5 s (con la pupila visible) y girar un poco a la izquierda 3 s. | ~2-4 % (normal) |
-| 1-2 | 3 cierres de 1,5 s, 3 parpadeos lentos y girar un poco a la derecha 3 s. | ~8-10 % (precaución) |
-| 2-3 | 4 cierres de 2 s. Trampas: mirar el celular 3 s y entrecerrar los ojos 4 s. | ~14-16 % (somnolencia) |
+| 0-1 | Parpadeos dirigidos: «Haz un parpadeo» (5 veces) y «Tres parpadeos seguidos» (2 veces). Trampas: entrecerrar los ojos 5 s (con la pupila visible) y girar un poco la cabeza a la izquierda 4 s, con un parpadeo ahí. | ~2-4 % (normal) |
+| 1-2 | 3 cierres de 1,5 s, 3 parpadeos lentos y girar un poco la cabeza a la derecha 4 s, con un parpadeo ahí. | ~8-10 % (precaución) |
+| 2-3 | 4 cierres de 2 s. Trampas: mirar el celular 3 s y entrecerrar los ojos 4 s. Mirar a la derecha y a la izquierda solo con los ojos (sin girar la cabeza), con un parpadeo en cada lado. | ~14-16 % (somnolencia) |
 | 3-4 | 2 cierres de 4 s y 1 de 3 s. | ~18-21 % (somnolencia) |
 
-- Mirar el celular y los giros pueden sacar la postura de rango. Por eso van repartidos, como mucho 3 s por minuto:
+- Mirar el celular y los giros pueden sacar la postura de rango. Por eso van repartidos, como mucho 4 s por minuto:
   cada ventana conserva los 54 s válidos que exige PERCLOS.
 - Los segundos exactos de cada paso están en `SCRIPT`, en `grabar_perclos.py`.
 - No hace falta exactitud al segundo: lo que cuenta es lo que se anota después, no el guion.
