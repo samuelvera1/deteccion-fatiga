@@ -8,11 +8,14 @@ import fatigue_geometry
 class HeadPoseTracker:
     """Estado de la postura de la cabeza.
 
-    max_pitch / max_yaw: rango válido para las métricas del ojo; frontal_max: rango de la puerta de
-    estabilidad. on_out_of_range(duración) se llama al terminar cada intervalo fuera de rango."""
+    max_pitch / max_yaw: rango válido para las métricas del ojo. max_pitch es un número (igual hacia arriba y hacia
+    abajo) o (abajo, arriba): pitch positivo = cabeza hacia abajo. frontal_max: rango de la puerta de estabilidad.
+    on_out_of_range(duración) se llama al terminar cada intervalo fuera de rango."""
 
     def __init__(self, max_pitch, max_yaw, frontal_max, on_out_of_range):
-        self.max_pitch, self.max_yaw, self.frontal_max = max_pitch, max_yaw, frontal_max
+        down, up = max_pitch if isinstance(max_pitch, (tuple, list)) else (max_pitch, max_pitch)
+        self.max_pitch_down, self.max_pitch_up = float(down), float(up)
+        self.max_yaw, self.frontal_max = max_yaw, frontal_max
         self._on_out_of_range = on_out_of_range
         self.ref = None                       # ejes de la cabeza en la calibración (postura frontal)
         self.samples = []                     # ejes de los frames de calibración
@@ -75,21 +78,21 @@ class HeadPoseTracker:
         return (float(np.degrees(np.arctan2(r[0, 2], r[2, 2]))),
                 float(np.degrees(np.arcsin(np.clip(-r[1, 2], -1.0, 1.0)))))
 
-    def _within(self, max_pitch, max_yaw):
+    def _within(self, max_down, max_up, max_yaw):
         """True si la cabeza está dentro del rango (o si aún no hay orientación disponible)."""
         if self.pose is None:
             return True
         yaw, pitch, _ = self.pose
-        return abs(pitch) <= max_pitch and abs(yaw) <= max_yaw
+        return -max_up <= pitch <= max_down and abs(yaw) <= max_yaw
 
     @property
     def eye_valid(self):
         """La apertura 2D del ojo es fiable con esta postura."""
-        return self._within(self.max_pitch, self.max_yaw)
+        return self._within(self.max_pitch_down, self.max_pitch_up, self.max_yaw)
 
     @property
     def frontal(self):
-        return self._within(self.frontal_max, self.frontal_max)
+        return self._within(self.frontal_max, self.frontal_max, self.frontal_max)
 
     def track_range(self, now):
         """Registra cada intervalo de postura fuera de rango (con su duración). Devuelve si es válida."""

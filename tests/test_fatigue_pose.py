@@ -58,6 +58,18 @@ class CameraAnglesTest(unittest.TestCase):
         head = HeadPoseTracker(max_pitch=10.0, max_yaw=40.0, frontal_max=15.0, on_out_of_range=lambda d: None)
         self.assertIsNone(head.camera_angles)
 
+    def test_pitch_limit_is_asymmetric(self):
+        """E12: cabeza hacia abajo hasta 10°, hacia arriba hasta 15° (pitch positivo = abajo)."""
+        head = HeadPoseTracker((10.0, 15.0), 40.0, 15.0, on_out_of_range=lambda d: None)
+        for k in range(5):
+            head.update(face(np.eye(3)), now=k / 30)
+            head.add_calibration_sample()
+        head.lock_reference()
+        for deg, valid in ((9.0, True), (12.0, False), (-12.0, True), (-14.5, True), (-16.0, False)):
+            head.update(face(rot_x(deg)), now=1.0)
+            self.assertAlmostEqual(head.pose[1], deg, places=6)
+            self.assertEqual(head.eye_valid, valid, deg)
+
     def test_valid_range_is_relative_to_calibration(self):
         """Con la cámara a 35° de costado, mirar la pantalla como en la calibración es postura válida; girar 45° más
         desde ahí no lo es, aunque con la cámara de frente ese mismo giro absoluto (10°) sería válido."""

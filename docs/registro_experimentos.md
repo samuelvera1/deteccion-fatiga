@@ -634,3 +634,52 @@ Solo ese experimento puede decir si el límite de ±10° se puede ampliar.
 **Alcance.**
 - Eyeblink8 son 4 personas alertas frente a un portátil.
 - Dice si la medida del ojo cerrado aguanta esos ángulos, no cómo se comporta un cabeceo de sueño real.
+
+**Resultado (2026-11-16).** Script `e12_cabeceo.py`, fuera del repositorio. El intervalo de 0-10° reproduce E8:
+sensibilidad 0,878 y falsos positivos 0,06 %.
+
+| \|Cabeceo\| | Sentido | Positivos | Sensibilidad | Negativos | Falsos positivos |
+|---|---|---|---|---|---|
+| 0-10° | ambos | 1440 | 0,878 | 57 830 | 0,06 % |
+| 10-15° | ambos | 126 | 0,873 | 3940 | 0,48 % |
+| 10-15° | arriba | 126 | 0,873 | 3912 | 0,08 % |
+| 10-15° | abajo | 0 | — | 28 | 57 % (16 de 28) |
+| 15-20° | ambos | 33 | 0,788 | 661 | 2,12 % |
+| 15-20° | arriba | 28 | 0,750 | 655 | 1,22 % |
+| 15-20° | abajo | 5 | — | 6 | 6 de 6 |
+| 20-25° | arriba | 29 | 0,897 | 294 | 0 % |
+| 25-30° | arriba | 0 | — | 45 | 6,7 % |
+
+- Pitch positivo = cabeza hacia abajo. Se comprobó con la geometría de `face_axes` y con el cabeceo del video con
+  gafas de E9 (+12°).
+- Criterio: 10-15° cumple (falsos positivos 0,48 %, sensibilidad 0,873). 15-20° no (2,12 % y 0,788). **El límite
+  que da el criterio es ±15°.**
+- Pero la salvaguarda por sentido solo se aplicaba con 500 negativos o más, y hacia abajo hay 28. En esos 28, el
+  57 % son cierres falsos. Es el riesgo que se temía: el párpado baja con la mirada. Apunta en el mismo sentido que
+  la sesión que motivó la regla (E1) y que los parpadeos prolongados falsos al inclinar la cabeza en el piloto de E5.
+- UTA-RLDD (23 videos): alerta disponible (ventana con ≥ 54 s válidos) según el límite.
+
+  | Límite | Media | Mediana | Videos con menos del 50 % |
+  |---|---|---|---|
+  | ±10° (antes) | 64,0 % | 75,2 % | 9 de 23 |
+  | abajo 10°, arriba 15° | 79,2 % | 100 % | 5 de 23 |
+  | ±15° | 88,7 % | 100 % | 3 de 23 |
+
+  El giro casi nunca saca de rango: 0 % en 22 videos y 2 % en uno. Lo que saca de rango es el cabeceo.
+- En siete videos, toda la sesión queda desplazada entre 10° y 14° respecto a la calibración (mediana del cabeceo):
+  la persona se acomodó después de calibrar. Son las «posturas naturales fuera de rango» que se vieron al revisar:
+  - hacia abajo: 02_0 (+12,8°), 02_10 (+10,7°), 04_10 (+10,0°);
+  - hacia arriba: 04_0 (−11,8°), 05_10 (−14,1°), 31_10 (−9,5°), 35_10 (−10,8°).
+
+**Decisión.** Se amplía solo hacia arriba: `POSE_MAX_PITCH_UP` = 15° y `POSE_MAX_PITCH_DOWN` = 10°.
+- Es una desviación conservadora del criterio, decidida después de ver los datos. Adopta la parte con evidencia
+  (3912 cuadros) y no la que tiene evidencia en contra, aunque sea escasa.
+- Golden master: en un video de referencia, el tiempo fuera de rango baja de 1,47 a 0,53 s y el PERCLOS final pasa
+  de 2,67 a 2,60 %. Las pruebas cubren el límite asimétrico.
+
+**Pendiente.**
+- (1) Hacia abajo: hace falta el experimento controlado que pidió E1, con la cabeza inclinada hacia abajo a ángulos
+  conocidos, ojos abiertos, parpadeos y cierres.
+- (2) Los videos desplazados hacia abajo (02_0, 02_10, 04_10) siguen casi sin alerta. Lo de fondo no es el ancho del
+  rango, sino que la referencia de la calibración deja de representar la postura de trabajo. Hipótesis para E13:
+  rehacer la referencia, y la apertura del ojo abierto, cuando la postura cambia de forma sostenida.

@@ -80,7 +80,13 @@ class Thresholds:
     # Fuera de rango no cuenta el PERCLOS; los parpadeos sí (E5: en Eyeblink8 FN 64 -> 17 sin subir los FP; en la
     # sesión piloto con gafas aparecieron 3 parpadeos prolongados falsos al inclinar la cabeza). El micro-sueño se
     # sigue evaluando (dormirse suele ir con cabeceo) y el intervalo se registra como POSTURA_FUERA_DE_RANGO.
-    POSE_MAX_PITCH = 10.0
+    # E12 (Eyeblink8, anotación por cuadro): con la cabeza 10-15° hacia ARRIBA respecto a la calibración, el ojo
+    # cerrado se mide como dentro del rango (sensibilidad 0,87, falsos positivos 0,08 % en 3912 cuadros) -> 15°.
+    # Hacia ABAJO no hay datos (28 cuadros, 57 % de cierres falsos: el párpado baja con la mirada) -> se queda en 10°.
+    # Pitch positivo = cabeza hacia abajo (fatigue_pose). En UTA-RLDD la alerta pasa de estar disponible el 64 % al
+    # 79 % del tiempo.
+    POSE_MAX_PITCH_DOWN = 10.0
+    POSE_MAX_PITCH_UP = 15.0
     POSE_MAX_YAW = 40.0
     # Postura "frontal" exigida por la puerta de estabilidad (calibración y análisis de gafas): la medida de
     # deformación de la malla reacciona sobre todo a los giros de cabeza (0.25-0.31 con 33-43° de yaw)

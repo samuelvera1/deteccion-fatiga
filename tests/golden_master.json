@@ -1,7 +1,7 @@
 {
  "sesiones/20261017_114229_Samuel_Vera/grabacion.mp4": {
-  "eventos_sha256": "fb4ac18180ee98a8e58d1ecd84e912a8a14593422c5b3c6dba5d327736447a1a",
-  "parametros_sha256": "cff3288ad05c9999605279aeaac260a18cb609994ee43320590d9ead89a9085d",
+  "eventos_sha256": "92d128f11842d3e9656bf23ec6cd25fb09e5b5a01c7dc223b851d2042fa81c29",
+  "parametros_sha256": "3cfdd1dcd8af494d45a00bb78eed5bdb1c58687609b97c5669968f47908d0f6e",
   "resumen": {
    "bostezos": 3,
    "calibracion_modo": "automatica",
@@ -40,17 +40,17 @@
    "parpadeos_descartados_profundidad": 2,
    "parpadeos_prolongados": 1,
    "paso_ojos_cerrados_apertura_min_ratio": 0.5180562621716458,
-   "perclos_final_pct": 2.67,
+   "perclos_final_pct": 2.6,
    "proporcion_parpadeos_prolongados": 0.0909,
    "recalibraciones": 0,
    "sonrisas_descartadas": 0,
-   "tiempo_postura_fuera_de_rango_s": 1.47
+   "tiempo_postura_fuera_de_rango_s": 0.53
   },
-  "traza_sha256": "69fbcd2fc0833115f88be56be42c7a59aa52be603f2e60e51cf50bdda888a5e9"
+  "traza_sha256": "833bf645e5675a0fcc475fe08689cb07ed89e7f1828462afa65ea9450819423e"
  },
  "sesiones/20261017_120014_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "8c6b278357be0964ca9cefc8c21166ab4b84482c10205bd1918401454f7e5269",
-  "parametros_sha256": "cff3288ad05c9999605279aeaac260a18cb609994ee43320590d9ead89a9085d",
+  "parametros_sha256": "3cfdd1dcd8af494d45a00bb78eed5bdb1c58687609b97c5669968f47908d0f6e",
   "resumen": {
    "bostezos": 2,
    "calibracion_modo": "automatica",
@@ -99,7 +99,7 @@
  },
  "sesiones/20261017_120716_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "5d2270f87399cb465c489b8e8694843e495d729eb5c54eb932acbd11c5a83dc6",
-  "parametros_sha256": "cff3288ad05c9999605279aeaac260a18cb609994ee43320590d9ead89a9085d",
+  "parametros_sha256": "3cfdd1dcd8af494d45a00bb78eed5bdb1c58687609b97c5669968f47908d0f6e",
   "resumen": {
    "bostezos": 1,
    "calibracion_modo": "automatica",

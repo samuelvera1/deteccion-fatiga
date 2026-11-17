@@ -100,8 +100,8 @@ class FatigueMonitor(Thresholds):
                                  self._log_detector_event)
 
         self._last_shape = None
-        self.head = HeadPoseTracker(self.POSE_MAX_PITCH, self.POSE_MAX_YAW, self.POSE_STABLE_MAX,
-                                    self._log_pose_out_of_range)
+        self.head = HeadPoseTracker((self.POSE_MAX_PITCH_DOWN, self.POSE_MAX_PITCH_UP), self.POSE_MAX_YAW,
+                                    self.POSE_STABLE_MAX, self._log_pose_out_of_range)
 
         self.fps_estimate = 30                # solo para los parámetros de parpadeo, aún en frames
         # PERCLOS ponderado por tiempo real (independiente de los fps): (t, dt, cerrado) en la ventana.

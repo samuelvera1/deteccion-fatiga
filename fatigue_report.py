@@ -68,7 +68,9 @@ def session_parameters(monitor):
                   "declaradas": monitor.has_glasses,
                   "cambio_a_mitad_de_sesion": "recalibrar con la tecla C"},
         "postura": {"referencia": "postura media de la calibración (mirando al frente)",
-                    "max_pitch_metricas_ojo": monitor.POSE_MAX_PITCH, "max_yaw_metricas_ojo": monitor.POSE_MAX_YAW,
+                    "max_pitch_abajo_metricas_ojo": monitor.POSE_MAX_PITCH_DOWN,
+                    "max_pitch_arriba_metricas_ojo": monitor.POSE_MAX_PITCH_UP,
+                    "max_yaw_metricas_ojo": monitor.POSE_MAX_YAW,
                     "max_giro_estabilidad": monitor.POSE_STABLE_MAX,
                     "fuera_de_rango": "no cuenta el PERCLOS; parpadeos y micro-sueño sí (marcado)"},
     }
