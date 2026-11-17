@@ -6,6 +6,14 @@ REQUISITOS
   - Cámara web (o un vídeo grabado).
   - No hace falta instalar Python ni nada más.
 
+COLOCACIÓN DE LA CÁMARA
+  - Mejor de frente (por ejemplo, la del portátil o una cámara encima del monitor). También funciona a un costado,
+    hasta unos 30°: calibra mirando la pantalla, como cuando trabajas.
+  - Límite: con la cámara a 45° de la cara (o más) el sistema no distingue bien el ojo cerrado. Por encima de 40°
+    avisa al calibrar; pon la cámara más de frente y recalibra (tecla C).
+  - Luz de frente, no detrás de ti. Con gafas, que la pantalla no se refleje en los lentes.
+  - Si te acomodas y te quedas en otra postura, el sistema rehace la referencia solo a los 20 s.
+
 CÓMO USARLO
   1. Instalación (si recibiste "FatigaDetector-Setup-....exe"): haz doble clic, pulsa "Siguiente" y "Instalar". No pide
      permisos de administrador. Queda un icono "Fatiga Detector" en el escritorio y en el menú Inicio.

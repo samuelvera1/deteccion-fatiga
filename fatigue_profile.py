@@ -99,6 +99,13 @@ class SubjectProfile:
         self.closed_ratio = level / self.open_ear_baseline
         self.closed_level_measured = measured
 
+    def rebase_open(self, open_ear):
+        """E14: nueva apertura de ojo abierto tras un cambio de postura sostenido; el ojo cerrado conserva su
+        proporción respecto al abierto (como en las recalibraciones automáticas)."""
+        self.open_ear_baseline = float(open_ear)
+        if self.closed_ratio is not None:
+            self.closed_ear_level = self.closed_ratio * self.open_ear_baseline
+
     def closure(self, ear):
         """Fracción de cierre del párpado: 0 = abierto como en la calibración, 1 = cerrado."""
         span = self.open_ear_baseline - self.closed_ear_level

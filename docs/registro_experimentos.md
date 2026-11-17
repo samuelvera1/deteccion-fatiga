@@ -832,3 +832,59 @@ referencia de postura y la apertura del ojo abierto recupera ese tiempo para PER
 - La diferencia de PERCLOS entre el video somnoliento y el alerta de cada persona, con y sin E14. Riesgo conocido:
   rehacer la apertura del ojo abierto con una persona ya somnolienta subestimaría PERCLOS. La regla solo actúa
   cuando la postura sale de rango, no dentro de él.
+
+**Resultado de E14 (2026-11-16).** Script `e14_reref.py`, fuera del repositorio.
+
+| Criterio | Resultado |
+|---|---|
+| (1) Disponibilidad media en UTA-RLDD (23 videos) | 79,2 % → 90,2 % (+11,0 puntos): **cumple** |
+| (2) Videos alerta: cierre ≥ 0,80 en los cuadros recuperados | 0,63 % (377 s recuperados), frente a 1,06 % en los comunes: **cumple** |
+| (3) Eyeblink8 | sensibilidad 0,878, falsos positivos 0,063 %, iguales a la versión actual (no se rehízo ninguna vez): **cumple** |
+
+- Se rehízo la referencia en 5 videos. Disponibilidad antes → después:
+  - 02_0: 6 % → 82 %, a los 118 s, cabeceo +13°;
+  - 02_10: 6 % → 86 %;
+  - 04_10: 38 % → 81 %;
+  - 05_10: 41 % → 91 %, a los 34 s, cabeceo −17° y giro +21°: la calibración se tomó mirando a la cámara;
+  - 35_10: 53 % → 58 %, dos veces.
+- 04_0 sigue en el 37 %. Sale y entra del rango a cada rato (nunca 20 s seguidos), y eso E14 no lo cubre.
+- Riesgo previsto, que no decide: en los 4 videos somnolientos donde se rehízo la referencia, el PERCLOS del video
+  bajó entre 0,4 y 5,4 puntos (35_10: de 34,0 a 28,6 %). La diferencia entre somnoliento y alerta de cada persona
+  sigue siendo positiva (persona 02: 0,7 → 0,5; 04: 2,3 → 1,8; 05: 13,6 → 12,5; 35: 32,8 → 27,4). Se vigila en la
+  ampliación de E4b.
+
+**Decisión.** SE ADOPTA E14.
+- Implementación: `SustainedPostureRebaser` en `fatigue_pose.py` y `SubjectProfile.rebase_open`. La nueva referencia
+  usa los ejes medios del tramo (rotación real), no la resta de ángulos de la simulación.
+- Cada vez que se rehace queda un evento REFERENCIA_REHECHA, y el resumen guarda `referencias_rehechas`.
+  `camara_yaw_grados` sigue siendo el de la calibración original.
+- Comprobación en vivo con `main.py` sobre los videos originales:
+  - 02_0 la rehace a los 117,6 s (la simulación, a los 118,0 s) y su tiempo fuera de rango baja del 72 % al 8,6 %;
+  - 05_10 la rehace a los 33,8 s (simulación: 34,2 s) y baja del 44 % al 5,9 %.
+- Golden master: trazas y eventos idénticos. Solo aparecen los campos nuevos.
+
+## Colocación de las personas respecto a la cámara en los datasets (2026-11-16, descriptivo)
+
+Ángulo de la cara respecto a la cámara (misma medida que `camara_yaw_grados`), 1 cuadro por segundo. Script
+`angulos_dataset.py`, fuera del repositorio.
+
+| Dataset | Videos | Giro mediano | Giro p10-p90 (extremos) | Cabeceo mediano | Cara detectada |
+|---|---|---|---|---|---|
+| UTA-RLDD, personas 01-06 | 12 | de −22° a +19° | de −30° a +30° | de −19° a +4° (cámara casi siempre por debajo de la cara) | 99-100 % de los cuadros |
+| Eyeblink8 | 8 | de −9° a +7° | de −13° a +11° | de −3° a +16° (cámara por encima) | 99-100 % |
+
+- Ninguna persona pasa de unos 30° de giro respecto a su cámara: todas quedan dentro del rango de trabajo
+  (límite de abajo).
+- Lo que las sacaba «fuera de rango» era la referencia de la calibración (corregido por E14), no la cámara.
+- Las personas 31-36 de UTA-RLDD no se miden: el zip se borró tras procesarlo y solo quedan sus trazas.
+
+## Límite declarado: cámara a menos de 45° de la cara (2026-11-16)
+
+- Con la evidencia de E10 (30°: el ojo cerrado se distingue; 42-47°: no, la apertura al cerrar solo baja al 60 %),
+  el responsable decide declarar el límite del software y no repetir la grabación a 45°.
+- Por eso el resultado formal de E10 a 45° es «no utilizable», con un solo intento con el guion. El primer intento
+  no llegó al paso de ojo cerrado.
+- El sistema avisa al calibrar si la cara queda a más de 40° de la cámara (`CAMERA_MAX_YAW_WARN`, evento
+  CAMARA_MUY_DE_LADO, campo `camara_muy_de_lado` del resumen).
+- El LEEME del ejecutable explica cómo colocar la cámara.
+- Todas las personas de los datasets quedan por debajo de ese límite.

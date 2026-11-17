@@ -72,7 +72,11 @@ def session_parameters(monitor):
                     "max_pitch_arriba_metricas_ojo": monitor.POSE_MAX_PITCH_UP,
                     "max_yaw_metricas_ojo": monitor.POSE_MAX_YAW,
                     "max_giro_estabilidad": monitor.POSE_STABLE_MAX,
-                    "fuera_de_rango": "no cuenta el PERCLOS; parpadeos y micro-sueño sí (marcado)"},
+                    "fuera_de_rango": "no cuenta el PERCLOS; parpadeos y micro-sueño sí (marcado)",
+                    "rehacer_referencia": {"sostenida_s": monitor.POSTURE_REBASE_HOLD_S,
+                                           "desviacion_max_grados": monitor.POSTURE_REBASE_MAX_STD,
+                                           "tope_cabeceo_grados": monitor.POSTURE_REBASE_CAP_PITCH,
+                                           "tope_giro_grados": monitor.POSTURE_REBASE_CAP_YAW}},
     }
 
 
@@ -135,6 +139,9 @@ def session_summary(monitor):
         "camara_pitch_grados": None if monitor.head.camera_angles is None else round(monitor.head.camera_angles[1], 1),
         "perclos_final_pct": round(monitor.perclos_val, 2),
         "recalibraciones": monitor.recalibration_count,
+        "referencias_rehechas": monitor.rebaser.count,
+        "camara_muy_de_lado": (None if monitor.head.camera_angles is None
+                               else abs(monitor.head.camera_angles[0]) > monitor.CAMERA_MAX_YAW_WARN),
         "ojo_abierto_ref": monitor.profile.open_ear_baseline,
         "ojo_cerrado_ref": monitor.profile.closed_ear_level,
         "ojo_cerrado_medido": monitor.profile.closed_level_measured,

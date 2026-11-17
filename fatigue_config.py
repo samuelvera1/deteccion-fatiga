@@ -91,6 +91,18 @@ class Thresholds:
     # Postura "frontal" exigida por la puerta de estabilidad (calibración y análisis de gafas): la medida de
     # deformación de la malla reacciona sobre todo a los giros de cabeza (0.25-0.31 con 33-43° de yaw)
     POSE_STABLE_MAX = 10.0
+    # E14: si la postura sale de rango y se queda quieta en la nueva posición POSTURE_REBASE_HOLD_S s (desviación típica
+    # <= POSTURE_REBASE_MAX_STD°), se rehace la referencia de postura y el ojo abierto (la persona se acomodó, o calibró
+    # en un momento atípico). Solo dentro de ±30° de cabeceo y ±40° de giro respecto a la calibración (E10). En
+    # UTA-RLDD la alerta pasa de estar disponible el 79 % al 90 % del tiempo sin más cierres en los videos alerta.
+    POSTURE_REBASE_HOLD_S = 20.0
+    # Límite de la cámara de lado (E10): con la cara a 30° de la cámara el ojo cerrado se distingue (la apertura baja
+    # al 41 % al cerrar); a 42-47° ya no (baja solo al 60 %, la calibración no lo capta). Por encima de este ángulo
+    # se avisa en la calibración. Límite declarado del software: cámara a menos de 45° de la cara.
+    CAMERA_MAX_YAW_WARN = 40.0
+    POSTURE_REBASE_MAX_STD = 4.0
+    POSTURE_REBASE_CAP_PITCH = 30.0
+    POSTURE_REBASE_CAP_YAW = 40.0
     # Periodo refractario tras contar un parpadeo (evita contar dos veces el mismo). Era 8 frames (~0.27 s)
     # y bloqueaba parpadeos reales de ráfagas (separados ~0.25 s). Con 3 frames (~0.1 s): S02 pasa de 24 a
     # 28 parpadeos en la sesión 20261006_114449 (29 cierres en la señal) y las sesiones de S01 con recuento

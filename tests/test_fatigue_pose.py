@@ -82,5 +82,71 @@ class CameraAnglesTest(unittest.TestCase):
         self.assertFalse(head.eye_valid)
 
 
+
+class PostureRebaseTest(unittest.TestCase):
+    """E14: postura fuera de rango y quieta 20 s -> referencia y ojo abierto rehechos."""
+
+    def run_frames(self, rotation, seconds, ear=0.10, start=1.0, fps=30.0):
+        result = None
+        for k in range(int(seconds * fps)):
+            now = start + k / fps
+            self.head.update(face(rotation), now)
+            valid = self.head.track_range(now)
+            got = self.rebaser.update(self.head, now, valid, ear if k % 40 else ear * 0.3)   # un parpadeo cada 40
+            result = got if got is not None else result
+        return result
+
+    def setUp(self):
+        from fatigue_pose import SustainedPostureRebaser
+        self.head = calibrated(np.eye(3))
+        self.head.max_pitch_down, self.head.max_pitch_up = 10.0, 15.0
+        self.rebaser = SustainedPostureRebaser(hold_s=20.0, max_std=4.0, cap_pitch=30.0, cap_yaw=40.0)
+
+    def test_sustained_new_posture_is_rebased(self):
+        self.assertIsNone(self.run_frames(rot_x(13.0), 15.0))          # 15 s: todavía no
+        new_open = self.run_frames(rot_x(13.0), 6.0, start=16.0)        # pasa de 20 s seguidos
+        self.assertAlmostEqual(new_open, 0.10)                          # sin los parpadeos
+        self.assertEqual(self.rebaser.count, 1)
+        self.head.update(face(rot_x(13.0)), 30.0)
+        self.assertTrue(self.head.eye_valid)
+        self.assertAlmostEqual(abs(self.head.pose[1]), 0.0, places=6)
+        self.assertAlmostEqual(self.head.camera_angles[1], 0.0, places=6)   # la calibración original no cambia
+        self.head.update(face(np.eye(3)), 31.0)                              # volver a la postura original:
+        self.assertAlmostEqual(abs(self.head.pose[1]), 13.0, places=6)       # 13° respecto a la nueva referencia
+
+    def test_moving_head_is_not_rebased(self):
+        result = None
+        for k in range(30 * 25):
+            now = 1.0 + k / 30
+            deg = 12.0 + 8.0 * np.sin(k / 15)                       # fuera de rango pero moviéndose (±8°)
+            self.head.update(face(rot_x(deg)), now)
+            got = self.rebaser.update(self.head, now, self.head.track_range(now), 0.1)
+            result = got if got is not None else result
+        self.assertIsNone(result)
+
+    def test_beyond_cap_is_not_rebased(self):
+        self.assertIsNone(self.run_frames(rot_x(35.0), 25.0))      # 35° respecto a la calibración: más allá del tope
+
+
+class CameraLimitWarningTest(unittest.TestCase):
+    """Límite declarado (E10): con la cámara a más de 40° de la cara se avisa al calibrar."""
+
+    def warn(self, deg):
+        import contextlib
+        import io
+
+        from fatigue_framework import FatigueMonitor
+        monitor = FatigueMonitor(video_source="x.mp4", save_trace=False, alert_sound=False)
+        monitor.head.ref0 = rot_y(deg)
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            monitor._warn_if_camera_too_far_aside()
+        return out.getvalue()
+
+    def test_warns_beyond_limit_only(self):
+        self.assertEqual(self.warn(30.0), "")
+        self.assertIn("muy de lado", self.warn(44.0))
+        self.assertIn("muy de lado", self.warn(-47.0))
+
+
 if __name__ == "__main__":
     unittest.main()

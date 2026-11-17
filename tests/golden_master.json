@@ -1,10 +1,11 @@
 {
  "sesiones/20261017_114229_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "92d128f11842d3e9656bf23ec6cd25fb09e5b5a01c7dc223b851d2042fa81c29",
-  "parametros_sha256": "3cfdd1dcd8af494d45a00bb78eed5bdb1c58687609b97c5669968f47908d0f6e",
+  "parametros_sha256": "8cf6f78017adb22aaf507bd7792cc2194f299a35e5a1a1b1a7d62b4367354c64",
   "resumen": {
    "bostezos": 3,
    "calibracion_modo": "automatica",
+   "camara_muy_de_lado": false,
    "camara_pitch_grados": 2.2,
    "camara_yaw_grados": -4.1,
    "duracion_media_bostezo_s": 2.2889,
@@ -43,6 +44,7 @@
    "perclos_final_pct": 2.6,
    "proporcion_parpadeos_prolongados": 0.0909,
    "recalibraciones": 0,
+   "referencias_rehechas": 0,
    "sonrisas_descartadas": 0,
    "tiempo_postura_fuera_de_rango_s": 0.53
   },
@@ -50,10 +52,11 @@
  },
  "sesiones/20261017_120014_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "8c6b278357be0964ca9cefc8c21166ab4b84482c10205bd1918401454f7e5269",
-  "parametros_sha256": "3cfdd1dcd8af494d45a00bb78eed5bdb1c58687609b97c5669968f47908d0f6e",
+  "parametros_sha256": "8cf6f78017adb22aaf507bd7792cc2194f299a35e5a1a1b1a7d62b4367354c64",
   "resumen": {
    "bostezos": 2,
    "calibracion_modo": "automatica",
+   "camara_muy_de_lado": false,
    "camara_pitch_grados": -0.2,
    "camara_yaw_grados": -1.0,
    "duracion_media_bostezo_s": 2.1833,
@@ -92,6 +95,7 @@
    "perclos_final_pct": 0.4,
    "proporcion_parpadeos_prolongados": 0.0,
    "recalibraciones": 0,
+   "referencias_rehechas": 0,
    "sonrisas_descartadas": 0,
    "tiempo_postura_fuera_de_rango_s": 0.0
   },
@@ -99,10 +103,11 @@
  },
  "sesiones/20261017_120716_Samuel_Vera/grabacion.mp4": {
   "eventos_sha256": "5d2270f87399cb465c489b8e8694843e495d729eb5c54eb932acbd11c5a83dc6",
-  "parametros_sha256": "3cfdd1dcd8af494d45a00bb78eed5bdb1c58687609b97c5669968f47908d0f6e",
+  "parametros_sha256": "8cf6f78017adb22aaf507bd7792cc2194f299a35e5a1a1b1a7d62b4367354c64",
   "resumen": {
    "bostezos": 1,
    "calibracion_modo": "automatica",
+   "camara_muy_de_lado": false,
    "camara_pitch_grados": -0.3,
    "camara_yaw_grados": -1.2,
    "duracion_media_bostezo_s": 2.2,
@@ -141,6 +146,7 @@
    "perclos_final_pct": 0.27,
    "proporcion_parpadeos_prolongados": 0.25,
    "recalibraciones": 0,
+   "referencias_rehechas": 0,
    "sonrisas_descartadas": 0,
    "tiempo_postura_fuera_de_rango_s": 0.0
   },

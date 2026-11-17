@@ -16,7 +16,7 @@ from fatigue_config import Thresholds
 from fatigue_core import FaceMeshDetector
 from fatigue_eyes import EyeEventDetector
 from fatigue_perclos import PerclosWindow
-from fatigue_pose import HeadPoseTracker
+from fatigue_pose import HeadPoseTracker, SustainedPostureRebaser
 from fatigue_profile import LandmarkStabilityGate, SubjectProfile, SustainedClosureFilter
 from fatigue_yawn import YawnDetector
 from kss import KSSPrompter
@@ -102,6 +102,8 @@ class FatigueMonitor(Thresholds):
         self._last_shape = None
         self.head = HeadPoseTracker((self.POSE_MAX_PITCH_DOWN, self.POSE_MAX_PITCH_UP), self.POSE_MAX_YAW,
                                     self.POSE_STABLE_MAX, self._log_pose_out_of_range)
+        self.rebaser = SustainedPostureRebaser(self.POSTURE_REBASE_HOLD_S, self.POSTURE_REBASE_MAX_STD,
+                                               self.POSTURE_REBASE_CAP_PITCH, self.POSTURE_REBASE_CAP_YAW)
 
         self.fps_estimate = 30                # solo para los parámetros de parpadeo, aún en frames
         # PERCLOS ponderado por tiempo real (independiente de los fps): (t, dt, cerrado) en la ventana.
@@ -155,8 +157,29 @@ class FatigueMonitor(Thresholds):
 
     # ------------------------------------------------------------------ calibración
 
+    def _warn_if_camera_too_far_aside(self):
+        """E10: con la cámara a más de CAMERA_MAX_YAW_WARN° de la cara no se distingue bien el ojo cerrado."""
+        angles = self.head.camera_angles
+        if angles is None or abs(angles[0]) <= self.CAMERA_MAX_YAW_WARN:
+            return
+        print(f"[AVISO] La cámara está muy de lado: la cara queda a {abs(angles[0]):.0f}° de ella. Por encima de unos "
+              f"{self.CAMERA_MAX_YAW_WARN:.0f}° el sistema no distingue bien el ojo cerrado (a 45° no lo logra). "
+              "Pon la cámara más de frente y recalibra con la tecla C.")
+        self._log_event("CAMARA_MUY_DE_LADO", self.perclos_val, self.has_glasses, 0.0, value=round(angles[0], 1))
+
+    def _rebase_posture(self, now, ear, new_open):
+        """E14: la postura salió de rango y se quedó quieta en la nueva posición: referencia y ojo abierto rehechos."""
+        old = self.profile.open_ear_baseline
+        self.profile.rebase_open(new_open)
+        yaw0, pitch0 = self.head.angles_vs_calibration(self.head.ref)
+        print(f"[POSTURA] Postura nueva sostenida {self.rebaser.hold_s:.0f} s: referencia rehecha (giro {yaw0:+.0f}°, "
+              f"cabeceo {pitch0:+.0f}° respecto a la calibración; ojo abierto {old:.4f} -> {new_open:.4f}), t = {now:.1f} s")
+        self._log_event("REFERENCIA_REHECHA", self.perclos_val, self.has_glasses, new_open,
+                        value=f"giro {yaw0:+.1f} cabeceo {pitch0:+.1f}")
+
     def _reset_tracking_state(self):
         self.eyes.reset()
+        self.rebaser.reset()
         self.yawn.reset()
         self._closed_run.reset()
         self._closed_phase_started = None
@@ -312,6 +335,7 @@ class FatigueMonitor(Thresholds):
                     print(f"[PASO 2] Ojo cerrado reutilizado de la calibración inicial: "
                           f"{self.profile.closed_ratio:.0%} del ojo abierto (sin repetir el pitido)")
                 self._log_event("CALIBRACION", self.perclos_val, self.has_glasses, self.profile.open_ear_baseline)
+                self._warn_if_camera_too_far_aside()
             self._write_trace(now, left_ear, right_ear, ear, mouth)
             return False, False
 
@@ -378,6 +402,10 @@ class FatigueMonitor(Thresholds):
         # Paso 3: monitoreo adaptativo
         is_yawning, yawn_blocks_blinks = self.yawn.update(mouth, now, ear, shape)
         pose_valid = self.head.track_range(now)
+        new_open = self.rebaser.update(self.head, now, pose_valid, ear)
+        if new_open is not None:
+            self._rebase_posture(now, ear, new_open)
+            pose_valid = self.head.track_range(now)
         is_microsleep = self.eyes.update(ear, yawn_blocks_blinks, now, pose_valid)
         level = self.alert.update(now, self.perclos_val, self.perclos.total_time, is_microsleep)
         if level is not None:
