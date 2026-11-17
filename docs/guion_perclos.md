@@ -9,16 +9,26 @@ medida del cierre, no la somnolencia real.
 - Dos videos de la misma persona: uno **sin gafas** y otro **con gafas** (en E8, las gafas cambiaron mucho el
   nivel de ojo cerrado).
 - Luz normal de oficina, cara de frente a la cámara, a la distancia habitual.
-- Una segunda persona lee el guion en voz alta con un cronómetro. El cronómetro arranca cuando el programa
-  termina la calibración y empieza a medir.
-- Comando (PowerShell, en la carpeta del proyecto), cambiando la condición en el segundo video:
+- Al lado de la ventana del programa, un texto abierto para leer (los minutos «normales») y el celular a mano
+  (minuto de trampas).
+- **Guía de voz** (`grabar_perclos.py`): abre el programa y, cuando termina la calibración y empieza a medir, una
+  voz de Windows dice cada paso del guion («Cierra», «Abre», «Mira el celular»…). Así cada minuto del guion coincide
+  con una ventana de 60 s de PERCLOS y no hace falta una segunda persona con cronómetro. Comandos (PowerShell, en la
+  carpeta del proyecto):
 
   ```
-  .\venv\Scripts\python.exe main.py --sujeto S01 --condicion sin_gafas --grabar --sin-sonido
+  .\venv\Scripts\python.exe grabar_perclos.py --probar-voz
+  .\venv\Scripts\python.exe grabar_perclos.py --sujeto S01 --condicion sin_gafas
+  .\venv\Scripts\python.exe grabar_perclos.py --sujeto S01 --condicion con_gafas
   ```
 
-  `--sin-sonido` evita que el pitido de las alertas provoque parpadeos o sustos. En la calibración, cuando pida
-  cerrar los ojos, mantenlos cerrados hasta que la otra persona te diga que el programa pide abrirlos.
+  El primero solo prueba la voz y el volumen. Los otros graban cada video con `--grabar --sin-sonido`.
+  `--sin-sonido` silencia las alertas de fatiga, para que su pitido no provoque parpadeos ni sustos. El pitido de la
+  calibración sí suena: cuando el programa pida cerrar los ojos, mantenlos cerrados hasta oírlo.
+- Si la consola dice que el ojo cerrado se tomó de la **RESERVA (no medido)**, pulsa Q y vuelve a empezar: E9 no
+  acepta esa grabación. Al oír «Fin del guion», pulsa Q en la ventana del programa.
+- Sin voz en español instalada, una segunda persona lee el guion en voz alta con un cronómetro, que arranca cuando
+  el programa empieza a medir.
 
 ## Guion (6 bloques de 1 minuto)
 
@@ -31,8 +41,8 @@ medida del cierre, no la somnolencia real.
 | 4-5 | 2 cierres de 4 s (segundos 10 y 35) y 1 de 2 s (segundo 50). | ~17-20 % |
 | 5-6 | Normal otra vez. | ~1-3 % |
 
-La persona que lee dice «cierra» y «abre» en voz alta. No hace falta exactitud al segundo: lo que cuenta es lo que
-se anota después, no el guion.
+La voz (o la persona que lee) dice «cierra» y «abre». Los segundos exactos de cada paso están en `SCRIPT`, en
+`grabar_perclos.py`. No hace falta exactitud al segundo: lo que cuenta es lo que se anota después, no el guion.
 
 ## Después de grabar
 

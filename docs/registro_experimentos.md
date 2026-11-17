@@ -466,7 +466,8 @@ PERCLOS por minuto coinciden con la anotación O también con cierres largos y c
 **Datos.** Dos videos de la misma persona con el guion `docs/guion_perclos.md` (sin gafas y con gafas), grabados con
 `--grabar` y la versión del sistema del commit en que se graben. Referencia: anotación en modo ciego con B, M, X y O
 (guía, versión 2). Si la calibración de un video no mide el ojo cerrado (`ojo_cerrado_medido` falso), se repite la
-grabación: es un fallo de protocolo, no un resultado.
+grabación: es un fallo de protocolo, no un resultado. La guía de voz (`grabar_perclos.py`) se añadió antes de grabar.
+Sincroniza el guion con el inicio del conteo y no cambia ni el guion ni el criterio.
 
 **Criterio (sumando los dos videos, con `evaluar.py`).**
 - C1: sensibilidad por cuadro ≥ 0,80.
