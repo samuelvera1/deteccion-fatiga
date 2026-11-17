@@ -924,3 +924,48 @@ La ganancia en UTA-RLDD se conserva, porque ahí las personas siguen fuera del r
 **Fuera del alcance de E14b.** Mirar hacia abajo solo con los ojos da cierres falsos también contra la calibración
 original (bloque «ojos abajo»: cierre mediano 0,79, con picos de 1,0 y un micro-sueño falso de 14 s). Eso es la
 mirada, no la referencia, y lo trata E13 con la anotación.
+
+**Revisión de las sesiones guiadas, en vivo (2026-11-16; descriptiva, no sustituye a la anotación).**
+Script `revision_guiada.py`, fuera del repositorio. Compara lo que pidió la voz (`guia_voz.csv`) con lo que detectó
+el sistema:
+- un parpadeo pedido se cuenta si empieza en los 2,5 s siguientes;
+- un cierre pedido se da por detectado si al menos la mitad del tramo tiene cierre ≥ 0,80.
+
+| Sesión | Parpadeos pedidos contados | Cierres pedidos detectados | Micro-sueños fuera de los cierres pedidos |
+|---|---|---|---|
+| Sin gafas, de frente (202655) | 12 de 14 | 10 de 10 | 2: uno al entrecerrar (trampa) y otro poco antes de una cuenta regresiva |
+| Con gafas, de frente (195327, reflejos) | 3 de 3 | 3 de 10 (cierre máximo 0,62-0,84 en 4 de ellos) | ninguno |
+| Lateral 30° (205255) | 16 de 18 | 4 de 10 (cierre máximo ≥ 1,0, pero ≥ 0,80 solo el 17-39 % del tramo) | ninguno |
+| Posturas (223101) | 8 de 12 | 2 de 6 | 2, en «solo los ojos abajo» (uno de 14 s) |
+
+Lectura provisional, que la anotación confirmará o no:
+- De frente y sin gafas, el sistema funciona como se espera.
+- Con reflejos en las gafas, y con la cámara a 30°, los parpadeos se cuentan bien, pero el cierre sostenido no se
+  mantiene por encima de 0,80. PERCLOS lo subestimaría.
+- En el video de posturas:
+  - con la cabeza abajo, los cierres pedidos no llegan a 0,80 (máximo 0,75-0,79) y los parpadeos se descartan por
+    poco profundos, porque el ojo ya parece medio cerrado;
+  - con solo los ojos abajo, el ojo abierto se mide como cerrado (0,8-1,0): da parpadeos y micro-sueños falsos.
+
+**Resultado de E14b (2026-11-16).** Script `e14b_temporal.py`, fuera del repositorio.
+
+| Criterio | Resultado |
+|---|---|
+| (1) Disponibilidad media en UTA-RLDD | 79,2 % → 90,7 %: cumple (con E14 era 90,2 %) |
+| (2) Videos alerta: cierre ≥ 0,80 | recuperados 0,63 % (377 s) frente a comunes 1,06 %: cumple |
+| (3) Eyeblink8 | sensibilidad 0,878, falsos positivos 0,063 %: cumple |
+| (4) Video de posturas, al final | cierre −0,012 con E14b frente a −0,016 contra la calibración (con E14 era +0,26): cumple |
+
+- Además, E14b le quita mucho menos PERCLOS a los videos somnolientos: 35_10 pasa de 34,0 a 33,3 % (con E14, a
+  28,6 %) y 05_10 de 13,8 a 12,3 %.
+- Mirar solo con los ojos hacia abajo sigue dando un cierre mediano de 0,79. No es cosa de la referencia (E13).
+
+**Decisión.** E14b sustituye a E14.
+- La referencia rehecha es temporal: `HeadPoseTracker.temp_ref` y `SubjectProfile.temporary_open`.
+- La calibración manda en cuanto la postura vuelve a su rango.
+- Los ángulos de la traza vuelven a ser siempre respecto a la calibración.
+- Comprobación en vivo con `main.py`:
+  - 02_0: referencia temporal a los 117,6 s; fuera de rango el 8,4 % (sin corrección, 72 %);
+  - 05_10: referencia temporal a los 33,8 s; fuera de rango el 3,7 % (sin corrección, 44 %);
+  - video de posturas reanalizado: ninguna referencia temporal y cierre final −0,03.
+- Pruebas: 108. Golden master: sin cambios.

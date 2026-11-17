@@ -30,7 +30,9 @@ class SubjectProfile:
         self._ipd_samples = []
         self._shape_samples = []
         self._closed_samples = []
-        self.open_ear_baseline = None
+        self.open_ear_baseline = None         # ojo abierto vigente (el de la calibración o el temporal de E14b)
+        self.calibrated_open = None           # ojo abierto de la calibración
+        self.temporary_open = None            # E14b: ojo abierto de la referencia temporal de postura
         self.neutral_mouth_ratio = None
         self.ipd_baseline = None
         # Forma neutra de la boca (unidades de IPD): ancho entre comisuras, distancia nariz-mentón y
@@ -100,11 +102,18 @@ class SubjectProfile:
         self.closed_level_measured = measured
 
     def rebase_open(self, open_ear):
-        """E14: nueva apertura de ojo abierto tras un cambio de postura sostenido; el ojo cerrado conserva su
-        proporción respecto al abierto (como en las recalibraciones automáticas)."""
-        self.open_ear_baseline = float(open_ear)
+        """E14b: ojo abierto de la referencia temporal de postura (se usa con set_active(True))."""
+        self.temporary_open = float(open_ear)
+
+    def set_active(self, temporary):
+        """E14b: ojo abierto vigente = el temporal (fuera del rango de la calibración, dentro del temporal) o el de la
+        calibración. El ojo cerrado conserva su proporción respecto al abierto."""
+        target = self.temporary_open if temporary and self.temporary_open is not None else self.calibrated_open
+        if target is None or target == self.open_ear_baseline:
+            return
+        self.open_ear_baseline = target
         if self.closed_ratio is not None:
-            self.closed_ear_level = self.closed_ratio * self.open_ear_baseline
+            self.closed_ear_level = self.closed_ratio * target
 
     def closure(self, ear):
         """Fracción de cierre del párpado: 0 = abierto como en la calibración, 1 = cerrado."""
@@ -146,6 +155,7 @@ class SubjectProfile:
         """Fija el perfil neutro con las muestras acumuladas."""
         # La mediana descarta los parpadeos y gestos puntuales ocurridos durante la calibración
         self.open_ear_baseline = float(np.median(self._ear_samples))
+        self.calibrated_open = self.open_ear_baseline
         self.neutral_mouth_ratio = float(np.median(self._mouth_samples))
         self.ipd_baseline = float(np.median(self._ipd_samples))
         if self._shape_samples:

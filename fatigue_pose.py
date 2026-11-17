@@ -29,8 +29,10 @@ class HeadPoseTracker:
         self.max_pitch_down, self.max_pitch_up = float(down), float(up)
         self.max_yaw, self.frontal_max = max_yaw, frontal_max
         self._on_out_of_range = on_out_of_range
-        self.ref = None                       # ejes de referencia vigentes (calibración, o rehechos por E14)
-        self.ref0 = None                      # ejes de la cabeza en la calibración (postura frontal)
+        self.ref = None                       # ejes de la cabeza en la calibración (postura frontal)
+        self.ref0 = None                      # alias de ref (la calibración original)
+        self.temp_ref = None                  # E14b: referencia temporal tras un cambio de postura sostenido
+        self.temp_pose = None                 # (yaw, pitch, roll) respecto a la referencia temporal
         self.samples = []                     # ejes de los frames de calibración
         self.last_axes = None
         self._last_axes_t = None
@@ -42,11 +44,14 @@ class HeadPoseTracker:
     def reset_reference(self):
         """Descarta la referencia y las muestras (recalibración)."""
         self.ref, self.ref0, self.samples, self.pose = None, None, [], None
+        self.temp_ref, self.temp_pose = None, None
 
     def rebase(self, ref):
-        """E14: nueva referencia de postura (ejes ortonormales) sin perder la de la calibración (ref0)."""
-        self.ref = ref
-        self.pose = (0.0, 0.0, 0.0)
+        """E14b: referencia temporal (ejes ortonormales). Solo se usa mientras la postura esté fuera del rango de la
+        calibración; dentro de él manda la calibración (con E14 la referencia nueva quedaba fija y sesgaba el ojo
+        abierto al volver a una postura normal: video de posturas 20261116_223101)."""
+        self.temp_ref = ref
+        self.temp_pose = (0.0, 0.0, 0.0)
 
     def angles_vs_calibration(self, axes):
         """(yaw, pitch) en grados de unos ejes respecto a la referencia de la calibración original."""
@@ -74,13 +79,10 @@ class HeadPoseTracker:
             self.speed = float(np.degrees(np.arccos(cos_angle)) / (now - prev_t))
         self.last_axes, self._last_axes_t = axes, now
         if axes is None or self.ref is None:
-            self.pose = None
+            self.pose = self.temp_pose = None
             return
-        r = axes @ self.ref.T
-        yaw = np.degrees(np.arctan2(r[0, 2], r[2, 2]))
-        pitch = np.degrees(np.arcsin(np.clip(-r[1, 2], -1.0, 1.0)))
-        roll = np.degrees(np.arctan2(r[1, 0], r[1, 1]))
-        self.pose = (float(yaw), float(pitch), float(roll))
+        self.pose = _relative_angles(axes, self.ref)
+        self.temp_pose = None if self.temp_ref is None else _relative_angles(axes, self.temp_ref)
 
     def lock_reference(self):
         """Postura de referencia = ejes medios de los frames de calibración, reortonormalizados (SVD)."""
@@ -101,17 +103,28 @@ class HeadPoseTracker:
         return (float(np.degrees(np.arctan2(r[0, 2], r[2, 2]))),
                 float(np.degrees(np.arcsin(np.clip(-r[1, 2], -1.0, 1.0)))))
 
-    def _within(self, max_down, max_up, max_yaw):
+    def _within(self, max_down, max_up, max_yaw, pose=None):
         """True si la cabeza está dentro del rango (o si aún no hay orientación disponible)."""
-        if self.pose is None:
+        pose = self.pose if pose is None else pose
+        if pose is None:
             return True
-        yaw, pitch, _ = self.pose
+        yaw, pitch, _ = pose
         return -max_up <= pitch <= max_down and abs(yaw) <= max_yaw
 
     @property
-    def eye_valid(self):
-        """La apertura 2D del ojo es fiable con esta postura."""
+    def in_calibration_range(self):
         return self._within(self.max_pitch_down, self.max_pitch_up, self.max_yaw)
+
+    @property
+    def using_temporary(self):
+        """E14b: fuera del rango de la calibración pero dentro del de la referencia temporal."""
+        return (not self.in_calibration_range and self.temp_pose is not None
+                and self._within(self.max_pitch_down, self.max_pitch_up, self.max_yaw, self.temp_pose))
+
+    @property
+    def eye_valid(self):
+        """La apertura 2D del ojo es fiable con esta postura (respecto a la calibración o a la referencia temporal)."""
+        return self.in_calibration_range or self.using_temporary
 
     @property
     def frontal(self):
@@ -135,12 +148,21 @@ class HeadPoseTracker:
             self._out_since = None
 
 
+def _relative_angles(axes, ref):
+    """(yaw, pitch, roll) en grados de unos ejes respecto a una referencia (convención de HeadPoseTracker.update)."""
+    r = axes @ ref.T
+    return (float(np.degrees(np.arctan2(r[0, 2], r[2, 2]))),
+            float(np.degrees(np.arcsin(np.clip(-r[1, 2], -1.0, 1.0)))),
+            float(np.degrees(np.arctan2(r[1, 0], r[1, 1]))))
+
+
 class SustainedPostureRebaser:
-    """E14: si la postura sale de rango y se queda quieta `hold_s` s en la nueva posición (desviación típica del giro y
+    """E14/E14b: si la postura sale de rango y se queda quieta `hold_s` s en la nueva posición (desviación típica del giro y
     del cabeceo <= `max_std`°), rehace la referencia de postura con los ejes medios de ese tramo, siempre que la nueva
     postura quede dentro de `cap_pitch`/`cap_yaw` respecto a la calibración original (más allá la malla no es fiable,
     E10). Devuelve la nueva apertura de ojo abierto: mediana del tramo sin parpadeos (cuadros >= `blink_floor` x su
-    percentil 90). Simulado en UTA-RLDD y Eyeblink8 antes de implementarlo (registro, E14)."""
+    percentil 90). La referencia es temporal (HeadPoseTracker.rebase): al volver al rango de la calibración manda la
+    calibración. Simulado en UTA-RLDD, Eyeblink8 y el video de posturas antes de implementarlo (E14 y E14b)."""
 
     def __init__(self, hold_s=20.0, max_std=4.0, cap_pitch=30.0, cap_yaw=40.0, blink_floor=0.75):
         self.hold_s, self.max_std = hold_s, max_std

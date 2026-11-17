@@ -84,7 +84,7 @@ class CameraAnglesTest(unittest.TestCase):
 
 
 class PostureRebaseTest(unittest.TestCase):
-    """E14: postura fuera de rango y quieta 20 s -> referencia y ojo abierto rehechos."""
+    """E14b: postura fuera de rango y quieta 20 s -> referencia y ojo abierto temporales."""
 
     def run_frames(self, rotation, seconds, ear=0.10, start=1.0, fps=30.0):
         result = None
@@ -102,17 +102,34 @@ class PostureRebaseTest(unittest.TestCase):
         self.head.max_pitch_down, self.head.max_pitch_up = 10.0, 15.0
         self.rebaser = SustainedPostureRebaser(hold_s=20.0, max_std=4.0, cap_pitch=30.0, cap_yaw=40.0)
 
-    def test_sustained_new_posture_is_rebased(self):
+    def test_sustained_new_posture_gets_a_temporary_reference(self):
         self.assertIsNone(self.run_frames(rot_x(13.0), 15.0))          # 15 s: todavía no
         new_open = self.run_frames(rot_x(13.0), 6.0, start=16.0)        # pasa de 20 s seguidos
         self.assertAlmostEqual(new_open, 0.10)                          # sin los parpadeos
         self.assertEqual(self.rebaser.count, 1)
         self.head.update(face(rot_x(13.0)), 30.0)
         self.assertTrue(self.head.eye_valid)
-        self.assertAlmostEqual(abs(self.head.pose[1]), 0.0, places=6)
-        self.assertAlmostEqual(self.head.camera_angles[1], 0.0, places=6)   # la calibración original no cambia
-        self.head.update(face(np.eye(3)), 31.0)                              # volver a la postura original:
-        self.assertAlmostEqual(abs(self.head.pose[1]), 13.0, places=6)       # 13° respecto a la nueva referencia
+        self.assertTrue(self.head.using_temporary)
+        self.assertAlmostEqual(self.head.pose[1], 13.0, places=6)          # la postura sigue medida contra la calibración
+        self.assertAlmostEqual(abs(self.head.temp_pose[1]), 0.0, places=6)
+        self.assertAlmostEqual(self.head.camera_angles[1], 0.0, places=6)
+        self.head.update(face(np.eye(3)), 31.0)                            # vuelve a la postura de la calibración:
+        self.assertTrue(self.head.eye_valid)                               # válida y con la calibración, no la temporal
+        self.assertFalse(self.head.using_temporary)
+
+    def test_profile_switches_open_eye_with_the_reference(self):
+        from fatigue_profile import SubjectProfile
+        profile = SubjectProfile(calibration_frames=3)
+        for _ in range(3):
+            profile.add_sample(0.10, 0.05, 100.0)
+        profile._set_closed_level(0.02, measured=True)                     # proporción 0,2
+        profile.rebase_open(0.13)
+        profile.set_active(True)
+        self.assertAlmostEqual(profile.open_ear_baseline, 0.13)
+        self.assertAlmostEqual(profile.closed_ear_level, 0.026)
+        profile.set_active(False)
+        self.assertAlmostEqual(profile.open_ear_baseline, 0.10)
+        self.assertAlmostEqual(profile.closed_ear_level, 0.02)
 
     def test_moving_head_is_not_rebased(self):
         result = None

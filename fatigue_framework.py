@@ -168,12 +168,14 @@ class FatigueMonitor(Thresholds):
         self._log_event("CAMARA_MUY_DE_LADO", self.perclos_val, self.has_glasses, 0.0, value=round(angles[0], 1))
 
     def _rebase_posture(self, now, ear, new_open):
-        """E14: la postura salió de rango y se quedó quieta en la nueva posición: referencia y ojo abierto rehechos."""
-        old = self.profile.open_ear_baseline
+        """E14b: la postura salió de rango y se quedó quieta en la nueva posición: referencia y ojo abierto temporales
+        (solo mientras siga fuera del rango de la calibración)."""
+        old = self.profile.calibrated_open
         self.profile.rebase_open(new_open)
-        yaw0, pitch0 = self.head.angles_vs_calibration(self.head.ref)
-        print(f"[POSTURA] Postura nueva sostenida {self.rebaser.hold_s:.0f} s: referencia rehecha (giro {yaw0:+.0f}°, "
-              f"cabeceo {pitch0:+.0f}° respecto a la calibración; ojo abierto {old:.4f} -> {new_open:.4f}), t = {now:.1f} s")
+        yaw0, pitch0 = self.head.angles_vs_calibration(self.head.temp_ref)
+        print(f"[POSTURA] Postura nueva sostenida {self.rebaser.hold_s:.0f} s: referencia temporal (giro {yaw0:+.0f}°, "
+              f"cabeceo {pitch0:+.0f}° respecto a la calibración; ojo abierto {old:.4f} -> {new_open:.4f} mientras "
+              f"sigas en esa postura), t = {now:.1f} s")
         self._log_event("REFERENCIA_REHECHA", self.perclos_val, self.has_glasses, new_open,
                         value=f"giro {yaw0:+.1f} cabeceo {pitch0:+.1f}")
 
@@ -406,6 +408,7 @@ class FatigueMonitor(Thresholds):
         if new_open is not None:
             self._rebase_posture(now, ear, new_open)
             pose_valid = self.head.track_range(now)
+        self.profile.set_active(self.head.using_temporary)
         is_microsleep = self.eyes.update(ear, yawn_blocks_blinks, now, pose_valid)
         level = self.alert.update(now, self.perclos_val, self.perclos.total_time, is_microsleep)
         if level is not None:
