@@ -1,0 +1,4 @@
+t_s,frame,tipo,fin_t_s,fin_frame,comentario,anotador,registrado
+23.144,702,PROBLEMA,23.276,706,falso parpadeo al mover la cabeza,revisor,2026-10-08T16:31:30
+27.562,836,PROBLEMA,27.628,838,falso parpadeo al mover la cabeza,revisor,2026-10-08T16:32:50
+33.860,1027,MICRO_BOSTEZO,37.091,1125,,revisor,2026-10-08T16:37:25

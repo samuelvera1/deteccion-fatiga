@@ -1,0 +1,85 @@
+t_guion_s,t_real_s,texto
+0.0,0.0,"Arrancamos. Minuto uno: parpadeos. Haz lo que te diga, con la cabeza quieta."
+7.0,7.016,Haz un parpadeo.
+11.0,11.0,Otro parpadeo.
+15.0,15.016,Uno más.
+19.0,19.0,Tres parpadeos seguidos.
+26.0,26.0,"Ahora, una trampa."
+28.0,28.016,"Entrecierra los ojos, sin cerrarlos."
+33.0,33.0,Normal.
+36.0,36.0,Haz un parpadeo.
+40.0,40.016,Gira un poco a la izquierda.
+43.0,43.0,Al frente.
+46.0,46.016,Tres parpadeos seguidos.
+51.0,51.0,Haz un parpadeo.
+55.0,55.0,Bien. Se vienen los cierres.
+60.0,60.016,Minuto dos: cierres cortos. No bajes la cabeza.
+66.0,66.0,Tres.
+67.0,67.016,Dos.
+68.0,68.0,Uno.
+69.0,69.016,Cierra.
+70.5,70.5,Abre.
+76.0,76.0,Parpadeo lento.
+81.0,81.016,Tres.
+82.0,82.0,Dos.
+83.0,83.016,Uno.
+84.0,84.016,Cierra.
+85.5,85.5,Abre.
+91.0,91.0,Parpadeo lento.
+96.0,96.016,Gira un poco a la derecha.
+99.0,99.016,Al frente.
+104.0,104.0,Tres.
+105.0,105.0,Dos.
+106.0,106.0,Uno.
+107.0,107.016,Cierra.
+108.5,108.516,Abre.
+113.0,113.0,Parpadeo lento.
+117.0,117.0,Bien hecho.
+120.0,120.0,Minuto tres: cierres de dos segundos. Cabeza quieta.
+125.0,125.0,Tres.
+126.0,126.0,Dos.
+127.0,127.016,Uno.
+128.0,128.0,Cierra.
+130.0,130.016,Abre.
+132.0,132.0,Mira el celular.
+135.0,135.016,Vuelve a la pantalla.
+138.0,138.0,Tres.
+139.0,139.0,Dos.
+140.0,140.016,Uno.
+141.0,141.0,Cierra.
+143.0,143.016,Abre.
+151.0,151.016,Tres.
+152.0,152.0,Dos.
+153.0,153.0,Uno.
+154.0,154.0,Cierra.
+156.0,156.016,Abre.
+164.0,164.0,Tres.
+165.0,165.0,Dos.
+166.0,166.016,Uno.
+167.0,167.0,Cierra.
+169.0,169.0,Abre.
+172.0,172.016,"Entrecierra los ojos, sin cerrarlos."
+176.0,176.016,Normal.
+180.0,180.0,Último minuto: cierres largos. Aguanta con los ojos cerrados hasta que te diga abre.
+187.0,187.016,Tres.
+188.0,188.016,Dos.
+189.0,189.0,Uno.
+190.0,190.016,Cierra.
+192.0,192.0,Aguanta.
+194.0,194.0,Abre.
+197.0,197.0,Cabeza quieta.
+202.0,202.0,Tres.
+203.0,203.0,Dos.
+204.0,204.0,Uno.
+205.0,205.016,Cierra.
+207.0,207.0,Aguanta.
+209.0,209.125,Abre.
+214.0,214.016,Vas muy bien.
+219.0,219.0,Tres.
+220.0,220.016,Dos.
+221.0,221.0,Uno.
+222.0,222.0,Cierra.
+223.5,223.516,Aguanta.
+225.0,225.0,Abre.
+231.0,231.031,Ya casi terminamos.
+242.0,242.0,"¡Listo, terminaste! Pulsa la tecla Q en la ventana del programa."

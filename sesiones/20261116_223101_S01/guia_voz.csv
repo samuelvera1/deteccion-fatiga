@@ -1,0 +1,55 @@
+t_guion_s,t_real_s,texto
+0.0,0.0,"Mira la pantalla, normal, y quédate así."
+7.0,7.016,Haz un parpadeo.
+12.0,12.016,Otro parpadeo.
+16.0,16.016,Tres.
+17.0,17.0,Dos.
+18.0,18.016,Uno.
+19.0,19.016,Cierra.
+21.0,21.0,Abre.
+30.0,30.016,"Baja un poco la cabeza, como para mirar el teclado, y quédate así."
+37.0,37.016,Haz un parpadeo.
+42.0,42.0,Otro parpadeo.
+46.0,46.016,Tres.
+47.0,47.016,Dos.
+48.0,48.0,Uno.
+49.0,49.0,Cierra.
+51.0,51.0,Abre.
+56.0,56.016,Vuelve a la pantalla.
+60.0,60.0,"Baja más la cabeza, como para mirar el celular en la mesa, y quédate así."
+67.0,67.016,Haz un parpadeo.
+72.0,72.0,Otro parpadeo.
+76.0,76.0,Tres.
+77.0,77.016,Dos.
+78.0,78.0,Uno.
+79.0,79.016,Cierra.
+81.0,81.0,Abre.
+86.0,86.0,Vuelve a la pantalla.
+90.0,90.016,"Ahora solo los ojos hacia abajo, sin mover la cabeza."
+97.0,97.016,Haz un parpadeo.
+102.0,102.0,Otro parpadeo.
+106.0,106.016,Tres.
+107.0,107.016,Dos.
+108.0,108.0,Uno.
+109.0,109.0,Cierra.
+111.0,111.016,Abre.
+116.0,116.016,Vuelve a la pantalla.
+120.0,120.0,"Sube un poco la cabeza, como para mirar arriba de la pantalla."
+127.0,127.0,Haz un parpadeo.
+132.0,132.032,Otro parpadeo.
+136.0,136.0,Tres.
+137.0,137.016,Dos.
+138.0,138.0,Uno.
+139.0,139.0,Cierra.
+141.0,141.016,Abre.
+146.0,146.016,Vuelve a la pantalla.
+150.0,150.016,"Mira directo a la cámara, y quédate así."
+157.0,157.016,Haz un parpadeo.
+162.0,162.0,Otro parpadeo.
+166.0,166.0,Tres.
+167.0,167.016,Dos.
+168.0,168.0,Uno.
+169.0,169.016,Cierra.
+171.0,171.0,Abre.
+176.0,176.0,Vuelve a la pantalla.
+182.0,182.016,"¡Listo, terminaste! Pulsa la tecla Q en la ventana del programa."

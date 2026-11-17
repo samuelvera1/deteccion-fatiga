@@ -1,0 +1,149 @@
+{
+  "sesion_id": "20261025_093348_Samuel_Vera",
+  "sujeto": "Samuel Vera",
+  "codigo_anonimo": "S01",
+  "condicion": "con_gafas",
+  "inicio": "2026-10-25T09:33:48",
+  "git": {
+    "commit": "f5d34db713c15f63d0ca6945628f5d924461dbf4",
+    "cambios_sin_commit": []
+  },
+  "versiones": {
+    "python": "3.11.9",
+    "opencv": "4.9.0",
+    "mediapipe": "0.10.14",
+    "numpy": "1.26.4"
+  },
+  "plataforma": "Windows-10-10.0.19045-SP0",
+  "fuente": "0",
+  "tipo_fuente": "camara",
+  "reloj": "sistema (tiempo real)",
+  "resolucion": [
+    1280,
+    720
+  ],
+  "fps_nativo_fuente": 30.0,
+  "parametros": {
+    "camara": {
+      "resolucion_pedida": [
+        1280,
+        720
+      ]
+    },
+    "facemesh": {
+      "min_detection_confidence": 0.6,
+      "min_tracking_confidence": 0.6,
+      "refine_landmarks": true
+    },
+    "calibracion": {
+      "frames_perfil": 90,
+      "frames_ojo_cerrado": 30,
+      "captura_ojo_cerrado_factor": 0.6,
+      "timeout_ojo_cerrado_s": 10.0,
+      "intentos_ojo_cerrado_en_vivo": 3,
+      "pausa_entre_intentos_s": 3.0,
+      "reserva_ojo_cerrado_ratio": 0.25,
+      "cierre_visible_max_ratio": 0.6,
+      "reapertura_cierre_max": 0.5,
+      "reapertura_frames": 3,
+      "modo": "automatica",
+      "marcas_manuales": null,
+      "frames_estables_requeridos": 15,
+      "max_movimiento_ipd": 0.03,
+      "suavizado_ipd": 0.2
+    },
+    "ojos": {
+      "parpadeo_factor_ref_local": 0.79,
+      "parpadeo_margen_reapertura": 0.06,
+      "parpadeo_margen_1_frame": 0.1,
+      "parpadeo_ventana_ref_s": [
+        0.9,
+        0.3
+      ],
+      "parpadeo_percentil_ref": 90,
+      "parpadeo_min_frames": 2,
+      "parpadeo_prolongado_min_s": 0.5,
+      "parpadeo_prolongado_cierre_min": 0.8,
+      "rafaga_cierre_pico": 0.8,
+      "rafaga_reapertura_parcial": 0.6,
+      "refractario_parpadeo_frames": 3,
+      "giro_rapido_cabeza_gs": 120.0,
+      "giro_rapido_cierre_min": 0.8,
+      "microsueno_cierre_min": 0.8,
+      "microsueno_min_s": 1.0,
+      "microsueno_cierre_salida": 0.7
+    },
+    "bostezo": {
+      "exagerado_factor_delta_seg": [
+        1.65,
+        0.25,
+        0.5
+      ],
+      "micro_factor_delta_seg": [
+        1.3,
+        0.15,
+        0.35
+      ],
+      "hueco_tolerado_frames": 2,
+      "sonrisa_ancho_min_ratio": 1.15,
+      "sonrisa_mandibula_max_ipd": 0.15,
+      "enfriamiento_s": 1.0
+    },
+    "perclos": {
+      "definicion": "P80",
+      "cierre_min": 0.8,
+      "incluye_parpadeos": true,
+      "ventana_s": 60,
+      "denominador_minimo_s": 15,
+      "ponderado_por_tiempo": true,
+      "hud_precaucion_pct": 8.0,
+      "hud_alerta_pct": 12.0
+    },
+    "kss": {
+      "activa": true,
+      "escala": "Karolinska Sleepiness Scale (Åkerstedt y Gillberg, 1990)",
+      "intervalo_min": 1.0,
+      "momentos": [
+        "inicio del conteo",
+        "periódica",
+        "final"
+      ],
+      "etiquetas": [
+        "Extremadamente alerta",
+        "Muy alerta",
+        "Alerta",
+        "Bastante alerta",
+        "Ni alerta ni somnoliento",
+        "Algunos signos de somnolencia",
+        "Somnoliento, sin esfuerzo para mantenerme despierto",
+        "Somnoliento, con algo de esfuerzo para mantenerme despierto",
+        "Muy somnoliento, gran esfuerzo para mantenerme despierto, luchando contra el sueño"
+      ],
+      "traduccion": "propia, no validada"
+    },
+    "alertas_fatiga": {
+      "precaucion_perclos_pct": 8.0,
+      "somnolencia_perclos_pct": 12.0,
+      "histeresis_pct": 2.0,
+      "ventana_s": 60,
+      "datos_validos_min_fraccion": 0.9,
+      "micro_sueno": "ojos >= 80 % cerrados durante >= 1 s",
+      "sonido": true,
+      "repeticion_sonido_somnolencia_s": 30.0,
+      "repeticion_sonido_micro_sueno_s": 3.0,
+      "base": "Hertig-Godeschalk et al. 2020; Wierwille y Ellsworth 1994; Dinges et al. 1998 (umbrales de PERCLOS 8-12 % en 1-3 min); PROVISIONALES"
+    },
+    "gafas": {
+      "origen": "condición declarada por el investigador (--condicion)",
+      "declaradas": true,
+      "cambio_a_mitad_de_sesion": "recalibrar con la tecla C"
+    },
+    "postura": {
+      "referencia": "postura media de la calibración (mirando al frente)",
+      "max_pitch_metricas_ojo": 10.0,
+      "max_yaw_metricas_ojo": 40.0,
+      "max_giro_estabilidad": 10.0,
+      "fuera_de_rango": "no se cuentan parpadeos ni PERCLOS; micro-sueño sí (marcado)"
+    }
+  }
+}

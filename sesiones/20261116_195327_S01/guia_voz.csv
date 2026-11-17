@@ -1,0 +1,77 @@
+t_guion_s,t_real_s,texto
+0.0,0.0,Arrancamos. Minuto uno de cuatro: lee tranquilo y parpadea normal.
+11.0,11.0,"Ahora, una trampa."
+14.0,14.016,"Entrecierra los ojos, sin cerrarlos."
+19.0,19.0,Normal.
+30.0,30.031,Gira un poco a la izquierda.
+33.0,33.016,Al frente.
+42.0,42.0,Vas muy bien. Sigue leyendo.
+52.0,52.0,En unos segundos empiezan los cierres.
+60.0,60.0,Minuto dos: tres cierres cortos y parpadeos lentos.
+66.0,66.016,Tres.
+67.0,67.0,Dos.
+68.0,68.016,Uno.
+69.0,69.0,Cierra.
+70.5,70.531,Abre.
+76.0,76.016,Parpadeo lento.
+81.0,81.0,Tres.
+82.0,82.016,Dos.
+83.0,83.0,Uno.
+84.0,84.016,Cierra.
+85.5,85.516,Abre.
+91.0,91.016,Parpadeo lento.
+96.0,96.016,Gira un poco a la derecha.
+99.0,99.0,Al frente.
+104.0,104.016,Tres.
+105.0,105.016,Dos.
+106.0,106.0,Uno.
+107.0,107.016,Cierra.
+108.5,108.516,Abre.
+113.0,113.0,Parpadeo lento.
+117.0,117.0,Bien hecho.
+120.0,120.031,Minuto tres: cuatro cierres de dos segundos.
+125.0,125.016,Tres.
+126.0,126.016,Dos.
+127.0,127.016,Uno.
+128.0,128.016,Cierra.
+130.0,130.016,Abre.
+132.0,132.016,Mira el celular.
+135.0,135.016,Vuelve a la pantalla.
+138.0,138.016,Tres.
+139.0,139.0,Dos.
+140.0,140.0,Uno.
+141.0,141.016,Cierra.
+143.0,143.016,Abre.
+151.0,151.016,Tres.
+152.0,152.016,Dos.
+153.0,153.016,Uno.
+154.0,154.0,Cierra.
+156.0,156.0,Abre.
+164.0,164.016,Tres.
+165.0,165.016,Dos.
+166.0,166.0,Uno.
+167.0,167.016,Cierra.
+169.0,169.0,Abre.
+172.0,172.016,"Entrecierra los ojos, sin cerrarlos."
+176.0,176.0,Normal.
+180.0,180.016,Último minuto: cierres largos. Aguanta con los ojos cerrados hasta que te diga abre.
+187.0,187.0,Tres.
+188.0,188.016,Dos.
+189.0,189.0,Uno.
+190.0,190.016,Cierra.
+192.0,192.031,Aguanta.
+194.0,194.016,Abre.
+202.0,202.016,Tres.
+203.0,203.016,Dos.
+204.0,204.0,Uno.
+205.0,205.0,Cierra.
+207.0,207.0,Aguanta.
+209.0,209.016,Abre.
+219.0,219.016,Tres.
+220.0,220.0,Dos.
+221.0,221.016,Uno.
+222.0,222.0,Cierra.
+223.5,223.516,Aguanta.
+225.0,225.0,Abre.
+231.0,231.016,Ya casi terminamos. Sigue leyendo.
+242.0,242.031,"¡Listo, terminaste! Pulsa la tecla Q en la ventana del programa."

@@ -1,0 +1,144 @@
+{
+  "sesion_id": "20261006_001819_Samuel_Vera",
+  "sujeto": "Samuel Vera",
+  "codigo_anonimo": "S01",
+  "condicion": "sin_gafas",
+  "inicio": "2026-10-06T00:18:19",
+  "git": {
+    "commit": "d6824a97335078243ca414c0760cd07533a77af5",
+    "cambios_sin_commit": [
+      ".gitignore",
+      "fatigue_framework.py",
+      "glasses_detector.py",
+      "main.py"
+    ]
+  },
+  "versiones": {
+    "python": "3.11.9",
+    "opencv": "4.9.0",
+    "mediapipe": "0.10.14",
+    "numpy": "1.26.4"
+  },
+  "plataforma": "Windows-10-10.0.19045-SP0",
+  "fuente": "0",
+  "reloj": "sistema (tiempo real)",
+  "resolucion": [
+    640,
+    480
+  ],
+  "fps_nativo_fuente": 30.0,
+  "parametros": {
+    "facemesh": {
+      "min_detection_confidence": 0.6,
+      "min_tracking_confidence": 0.6
+    },
+    "calibracion": {
+      "frames_perfil": 90,
+      "frames_ojo_cerrado": 30,
+      "captura_ojo_cerrado_factor": 0.6,
+      "timeout_ojo_cerrado_s": 10.0,
+      "reserva_ojo_cerrado_ratio": 0.25,
+      "frames_estables_requeridos": 15,
+      "max_movimiento_ipd": 0.03,
+      "max_deformacion_ipd": 0.08,
+      "factor_ojo_neutro": 0.85,
+      "suavizado_ipd": 0.2
+    },
+    "ojos": {
+      "parpadeo_factor_ref_local": 0.79,
+      "parpadeo_margen_reapertura": 0.06,
+      "parpadeo_margen_1_frame": 0.1,
+      "parpadeo_ventana_ref_s": [
+        0.9,
+        0.3
+      ],
+      "parpadeo_percentil_ref": 90,
+      "parpadeo_min_frames": 2,
+      "parpadeo_max_frames": 20,
+      "refractario_parpadeo_frames": 8,
+      "microsueno_cierre_min": 0.8,
+      "microsueno_min_s": 1.0,
+      "microsueno_cierre_salida": 0.7,
+      "ojo_no_cerrado_factor": 0.75
+    },
+    "bostezo": {
+      "exagerado_factor_delta_seg": [
+        1.65,
+        0.25,
+        0.5
+      ],
+      "micro_factor_delta_seg": [
+        1.3,
+        0.15,
+        0.35
+      ],
+      "hueco_tolerado_frames": 2,
+      "enfriamiento_s": 1.0
+    },
+    "perclos": {
+      "definicion": "P80",
+      "cierre_min": 0.8,
+      "incluye_parpadeos": true,
+      "ventana_s": 60,
+      "denominador_minimo_s": 15,
+      "ponderado_por_tiempo": true,
+      "hud_precaucion_pct": 15.0,
+      "hud_alerta_pct": 22.0
+    },
+    "gafas": {
+      "umbral_encendido_pct": 7.0,
+      "umbral_apagado_pct": 6.0,
+      "frames_consecutivos_cambio": 10,
+      "frames_analisis_mediana": 30,
+      "canny": [
+        40,
+        110
+      ],
+      "clahe_clip": 2.0,
+      "clahe_teselas": [
+        2,
+        2
+      ],
+      "filtro_bilateral": [
+        7,
+        30,
+        7
+      ],
+      "kernel_cierre": [
+        5,
+        3
+      ],
+      "peso_puente": 0.6,
+      "ipd_canonica_px": 100
+    },
+    "recalibracion": {
+      "rostro_perdido_s": 1.0,
+      "timeout_verificacion_s": 6.0,
+      "deformacion_persistente_s": 5.0
+    }
+  },
+  "fin": "2026-10-06T00:19:26",
+  "rendimiento": {
+    "fps_procesamiento_medio": 29.92,
+    "fps_procesamiento_mediana": 31.24,
+    "fps_procesamiento_p5": 18.28,
+    "cpu_proceso_pct_medio": 12.2,
+    "ram_proceso_mb_media": 217.2
+  },
+  "resumen": {
+    "duracion_s": 66.74,
+    "frames": 1979,
+    "frames_con_rostro": 1979,
+    "gafas_final": false,
+    "parpadeos": 14,
+    "bostezos": 2,
+    "micro_bostezos": 1,
+    "perclos_final_pct": 0.0,
+    "recalibraciones": 0,
+    "ojo_abierto_ref": 0.1082820378887618,
+    "ojo_cerrado_ref": 0.02707050947219045,
+    "ojo_cerrado_medido": false,
+    "ojo_cerrado_proporcion": 0.25,
+    "ojo_cerrado_reutilizado_en_recalibracion": false
+  }
+}

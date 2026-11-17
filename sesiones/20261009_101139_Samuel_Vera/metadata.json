@@ -1,0 +1,168 @@
+{
+  "sesion_id": "20261009_101139_Samuel_Vera",
+  "sujeto": "Samuel Vera",
+  "codigo_anonimo": "S01",
+  "condicion": "con_gafas",
+  "inicio": "2026-10-09T10:11:39",
+  "git": {
+    "commit": "35ad55248eba72faa549d7c5e0d857e45fca3caa",
+    "cambios_sin_commit": []
+  },
+  "versiones": {
+    "python": "3.11.9",
+    "opencv": "4.9.0",
+    "mediapipe": "0.10.14",
+    "numpy": "1.26.4"
+  },
+  "plataforma": "Windows-10-10.0.19045-SP0",
+  "fuente": "C:\\Users\\Practicante\\Pictures\\Camera Roll\\WIN_20261008_16_23_26_Pro.mp4",
+  "tipo_fuente": "video",
+  "reloj": "video (frame / fps del archivo)",
+  "resolucion": [
+    1280,
+    720
+  ],
+  "fps_nativo_fuente": 30.331202546652825,
+  "parametros": {
+    "camara": {
+      "resolucion_pedida": [
+        1280,
+        720
+      ]
+    },
+    "facemesh": {
+      "min_detection_confidence": 0.6,
+      "min_tracking_confidence": 0.6,
+      "refine_landmarks": true
+    },
+    "calibracion": {
+      "frames_perfil": 90,
+      "frames_ojo_cerrado": 30,
+      "captura_ojo_cerrado_factor": 0.6,
+      "timeout_ojo_cerrado_s": 10.0,
+      "reserva_ojo_cerrado_ratio": 0.25,
+      "cierre_visible_max_ratio": 0.6,
+      "reapertura_cierre_max": 0.5,
+      "reapertura_frames": 3,
+      "modo": "manual (marcas del vídeo)",
+      "marcas_manuales": {
+        "video": "WIN_20261008_16_23_26_Pro.mp4",
+        "fps": 30.331202546652825,
+        "frames_video": 1454,
+        "neutro": {
+          "inicio_frame": 0,
+          "fin_frame": 84,
+          "inicio_s": 0.0,
+          "fin_s": 2.769
+        },
+        "cerrado": {
+          "inicio_frame": 88,
+          "fin_frame": 142,
+          "inicio_s": 2.901,
+          "fin_s": 4.682
+        },
+        "inicio_prueba": {
+          "frame": 152,
+          "s": 5.011
+        },
+        "marcado": "2026-10-08T16:26:04"
+      },
+      "frames_estables_requeridos": 15,
+      "max_movimiento_ipd": 0.03,
+      "suavizado_ipd": 0.2
+    },
+    "ojos": {
+      "parpadeo_factor_ref_local": 0.79,
+      "parpadeo_margen_reapertura": 0.06,
+      "parpadeo_margen_1_frame": 0.1,
+      "parpadeo_ventana_ref_s": [
+        0.9,
+        0.3
+      ],
+      "parpadeo_percentil_ref": 90,
+      "parpadeo_min_frames": 2,
+      "parpadeo_prolongado_min_s": 0.5,
+      "parpadeo_prolongado_cierre_min": 0.8,
+      "rafaga_cierre_pico": 0.8,
+      "rafaga_reapertura_parcial": 0.6,
+      "refractario_parpadeo_frames": 3,
+      "giro_rapido_cabeza_gs": 120.0,
+      "giro_rapido_cierre_min": 0.8,
+      "microsueno_cierre_min": 0.8,
+      "microsueno_min_s": 1.0,
+      "microsueno_cierre_salida": 0.7
+    },
+    "bostezo": {
+      "exagerado_factor_delta_seg": [
+        1.65,
+        0.25,
+        0.5
+      ],
+      "micro_factor_delta_seg": [
+        1.3,
+        0.15,
+        0.35
+      ],
+      "hueco_tolerado_frames": 2,
+      "sonrisa_ancho_min_ratio": 1.15,
+      "sonrisa_mandibula_max_ipd": 0.15,
+      "enfriamiento_s": 1.0
+    },
+    "perclos": {
+      "definicion": "P80",
+      "cierre_min": 0.8,
+      "incluye_parpadeos": true,
+      "ventana_s": 60,
+      "denominador_minimo_s": 15,
+      "ponderado_por_tiempo": true,
+      "hud_precaucion_pct": 15.0,
+      "hud_alerta_pct": 22.0
+    },
+    "gafas": {
+      "origen": "condición declarada por el investigador (--condicion)",
+      "declaradas": true,
+      "cambio_a_mitad_de_sesion": "recalibrar con la tecla C"
+    },
+    "postura": {
+      "referencia": "postura media de la calibración (mirando al frente)",
+      "max_pitch_metricas_ojo": 10.0,
+      "max_yaw_metricas_ojo": 40.0,
+      "max_giro_estabilidad": 10.0,
+      "fuera_de_rango": "no se cuentan parpadeos ni PERCLOS; micro-sueño sí (marcado)"
+    }
+  },
+  "fin": "2026-10-09T10:12:10",
+  "rendimiento": {
+    "fps_procesamiento_medio": 46.39,
+    "fps_procesamiento_mediana": 50.8,
+    "fps_procesamiento_p5": 28.32,
+    "cpu_proceso_pct_medio": 21.6,
+    "ram_proceso_mb_media": 167.2
+  },
+  "resumen": {
+    "duracion_s": 47.9,
+    "calibracion_modo": "manual",
+    "inicio_monitoreo_s": 5.011,
+    "frames": 1454,
+    "frames_con_rostro": 1454,
+    "gafas_final": true,
+    "parpadeos": 13,
+    "parpadeos_prolongados": 0,
+    "proporcion_parpadeos_prolongados": 0.0,
+    "duracion_media_parpadeo_s": 0.1674,
+    "bostezos": 3,
+    "micro_bostezos": 2,
+    "duracion_media_bostezo_s": 1.3737,
+    "parpadeos_descartados_giro": 0,
+    "sonrisas_descartadas": 0,
+    "tiempo_postura_fuera_de_rango_s": 9.53,
+    "perclos_final_pct": 15.39,
+    "recalibraciones": 0,
+    "ojo_abierto_ref": 0.11953174179481388,
+    "ojo_cerrado_ref": 0.04484652383531394,
+    "ojo_cerrado_medido": true,
+    "ojo_cerrado_proporcion": 0.3751850609882077,
+    "ojo_cerrado_reutilizado_en_recalibracion": false,
+    "paso_ojos_cerrados_apertura_min_ratio": 0.2679797416984691
+  }
+}
