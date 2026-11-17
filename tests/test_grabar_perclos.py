@@ -110,3 +110,27 @@ class CameraPlacementTest(unittest.TestCase):
         self.assertEqual(g.TARGET_ANGLES, {"lateral_30": 30.0, "lateral_45": 45.0})
         self.assertEqual(g._source_from([]), 0)
         self.assertEqual(g._source_from(["--fuente", "1"]), 1)
+
+
+class PostureScriptTest(unittest.TestCase):
+    """Guion de E13: 6 posturas de 30 s, cada una con 2 parpadeos pedidos y un cierre de 2 s."""
+
+    def test_blocks(self):
+        script = g.script_for("postura")
+        self.assertIs(script, g.POSTURE_SCRIPT)
+        self.assertIs(g.script_for("sin_gafas"), g.SCRIPT)
+        for k, (instruction, _) in enumerate(g.POSTURES):
+            t0, t1 = k * g.POSTURE_BLOCK_S, (k + 1) * g.POSTURE_BLOCK_S
+            cues = [(t, text) for t, text in script if t0 <= t < t1]
+            self.assertEqual(cues[0], (t0, instruction))
+            self.assertEqual(sum(text in g.BLINK_CUES for _, text in cues), 2)
+            closes = [t for t, text in cues if text == "Cierra."]
+            opens = [t for t, text in cues if text == "Abre."]
+            self.assertEqual([b - a for a, b in zip(closes, opens)], [2.0])
+
+    def test_cues_fit_and_last_three_minutes(self):
+        script = g.POSTURE_SCRIPT
+        for (t, text), (t_next, _) in zip(script, script[1:]):
+            self.assertLessEqual(spoken_seconds(text), t_next - t, f"«{text}» se corta en {t} s")
+        self.assertEqual(script[-1][0], len(g.POSTURES) * g.POSTURE_BLOCK_S + 2.0)
+        self.assertIn("postura", g.CONDITIONS)

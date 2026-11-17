@@ -34,7 +34,8 @@ VOICE_RATE = 2                          # velocidad de la voz de Windows (-10 a 
 COUNTDOWN = ("Tres.", "Dos.", "Uno.")
 SQUINT = ("Entrecierra los ojos, sin cerrarlos.", "Normal.")
 # E9: cámara de frente, sin y con gafas. E10: cámara a un costado, a unos 30 y 45 grados de la dirección en que miras
-CONDITIONS = ("sin_gafas", "con_gafas", "lateral_30", "lateral_45")
+# E13: posturas de cabeza y mirada con verdad de terreno (guion POSTURE_SCRIPT, 3 minutos)
+CONDITIONS = ("sin_gafas", "con_gafas", "lateral_30", "lateral_45", "postura")
 # Colocación de la cámara en los videos de lado: la voz dice el ángulo en vivo hasta que queda en el objetivo
 TARGET_ANGLES = {"lateral_30": 30.0, "lateral_45": 45.0}
 ANGLE_TOLERANCE = 5.0           # grados
@@ -98,6 +99,33 @@ SCRIPT = sorted(
     + _closure(190.0, 4.0) + _closure(205.0, 4.0) + _closure(222.0, 3.0)
     + [(197.0, "Cabeza quieta."), (214.0, "Vas muy bien."), (231.0, "Ya casi terminamos.")]
     + [(END_CUE_S, "¡Listo, terminaste! Pulsa la tecla Q en la ventana del programa.")])
+
+# E13: cada postura se mantiene 30 s. Con ojos abiertos ~20 s (negativos), 2 parpadeos y un cierre de 2 s
+# (positivos), para medir el ojo cerrado con verdad de terreno (anotación B/M/O) en cada postura.
+POSTURE_BLOCK_S = 30.0
+POSTURES = (
+    ("Mira la pantalla, normal, y quédate así.", "pantalla"),
+    ("Baja un poco la cabeza, como para mirar el teclado, y quédate así.", "abajo_poco"),
+    ("Baja más la cabeza, como para mirar el celular en la mesa, y quédate así.", "abajo_mucho"),
+    ("Ahora solo los ojos hacia abajo, sin mover la cabeza.", "ojos_abajo"),
+    ("Sube un poco la cabeza, como para mirar arriba de la pantalla.", "arriba"),
+    ("Mira directo a la cámara, y quédate así.", "camara"),
+)
+
+
+def _posture_block(t, instruction, back=True):
+    return ([(t, instruction), (t + 7.0, BLINK_CUES[0]), (t + 12.0, BLINK_CUES[1])] + _closure(t + 19.0, 2.0)
+            + ([(t + 26.0, "Vuelve a la pantalla.")] if back else []))
+
+
+POSTURE_SCRIPT = sorted(
+    [c for k, (instruction, _) in enumerate(POSTURES)
+     for c in _posture_block(k * POSTURE_BLOCK_S, instruction, back=k > 0)]
+    + [(len(POSTURES) * POSTURE_BLOCK_S + 2.0, "¡Listo, terminaste! Pulsa la tecla Q en la ventana del programa.")])
+
+
+def script_for(condition):
+    return POSTURE_SCRIPT if condition == "postura" else SCRIPT
 
 # Antes de abrir el programa: en el video con gafas 20261116_195327 los reflejos de la pantalla tapaban los ojos
 START_CUE = "Revisa la luz: de frente, y sin reflejos de la pantalla en las gafas."
@@ -181,9 +209,9 @@ def _clock(t):
     return f"{int(t) // 60}:{t % 60:04.1f}"
 
 
-def run_guide(speaker, t0, stop, log, said):
+def run_guide(speaker, t0, stop, log, said, script=None):
     """Dice el guion con t0 (time.monotonic) como inicio del conteo; añade a `said` (t_guion, t_real, texto)."""
-    for t, text in SCRIPT:
+    for t, text in SCRIPT if script is None else script:
         if stop.wait(max(0.0, t0 + t - time.monotonic())):
             break
         speaker.say(text)
@@ -354,7 +382,8 @@ def main(argv=None):
         "en las gafas y ningún otro programa usando la cámara.")
     speaker.say(START_CUE)
     time.sleep(START_CUE_S)
-    log("[GUIA] Abriendo el programa. La voz te guía la calibración y el guion (4 minutos).")
+    script = script_for(args.condicion)
+    log(f"[GUIA] Abriendo el programa. La voz te guía la calibración y el guion ({script[-1][0] / 60:.0f} minutos).")
     proc = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
     stop, guide, said, timers = threading.Event(), None, [], []
@@ -396,7 +425,7 @@ def main(argv=None):
                 speaker.say(MEASURED_CUE)
         if "[MONITOREO]" in line:
             t0 = time.monotonic()
-            guide = threading.Thread(target=run_guide, args=(speaker, t0, stop, log, said), daemon=True)
+            guide = threading.Thread(target=run_guide, args=(speaker, t0, stop, log, said, script), daemon=True)
             guide.start()
     proc.wait()
     stop.set()
@@ -412,7 +441,7 @@ def main(argv=None):
         print("El programa terminó antes de empezar a medir: no hay video del guion"
               + (" (la cámara no dio imágenes; mira el aviso [CAMARA] de arriba)." if camera_lost else ".")
               + " Esa sesión quedó vacía: no sirve para anotar.")
-    elif last is None or last < END_CUE_S:
+    elif last is None or last < script[-1][0]:
         print(f"[AVISO] El programa terminó en el minuto {_clock(last or 0.0)} del guion, antes del final: "
               "repite la grabación si faltó algún bloque.")
     measured = None

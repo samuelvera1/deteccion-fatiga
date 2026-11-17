@@ -692,3 +692,74 @@ parpadeo pedido («Parpadea») en cuatro momentos: con la cabeza girada a cada l
 parpadeos con la cabeza girada y con la mirada lateral (otro monitor). Se informa cuántos de esos parpadeos cuenta
 el sistema (tramos de `guia_voz.csv`); no decide nada. Lo que puede sacar la postura de rango sigue por debajo de 6 s
 por minuto: como mucho 4 s.
+
+**Grabaciones de E9 y E10 (2026-11-16).**
+
+| Sesión | Condición | Commit | Guion | Estado |
+|---|---|---|---|---|
+| 20261116_195327 | con gafas | 2923ece | v2 | completa (E9) |
+| 20261116_202506 | sin gafas | 9ce8076 | v3 | interrumpida a los 82 s del guion: se descarta por incompleta |
+| 20261116_202655 | sin gafas | 9ce8076 | v3 (sin los parpadeos mirando a los lados de v3.1) | completa (E9) |
+| 20261116_205255 | lateral 30° | e1cc6f3 | v3.1 | completa (E10); cámara colocada a 30,7° |
+
+Observación del video lateral de 30°, después del guion: al mirar directo a la cámara (giro de unos 32°), la cabeza
+salió 10-13° «hacia abajo» y quedó fuera de rango por el límite de 10° hacia abajo. El cierre medido fue de unos 0,
+sin cierres falsos. Para la persona que grabó, que eso salga fuera de rango es un error.
+
+Diagnóstico, que no decide nada:
+- Se reprocesó el video calculando los ángulos en el marco de la cabeza en lugar del de la cámara. El acoplamiento
+  entre cabeceo y giro no cambió (pendiente −0,22 en los dos marcos), así que no es un error del marco de
+  referencia.
+- Con la cámara de frente también aparece: en los videos sin gafas y con gafas, girar unos 35° a la derecha da 7-9°
+  de cabeceo «hacia arriba».
+- No se puede saber si es movimiento real de la cabeza o un sesgo de la estimación de MediaPipe en giros grandes.
+
+## E13 — Cabeza hacia abajo y mirada hacia abajo con verdad de terreno (criterio fijado el 2026-11-16, antes de grabar)
+
+**Motivación.**
+- E12 no pudo decidir el límite hacia abajo: había 28 cuadros en Eyeblink8.
+- Mirar directo a una cámara de costado dio 10-13° hacia abajo y quedó fuera de rango (lateral de 30°).
+- El riesgo conocido sigue: al bajar la mirada el párpado baja y el ojo parece cerrado.
+
+**Hipótesis.**
+- (a) Con la cabeza 10-20° hacia abajo, el estado de ojo cerrado sigue siendo fiable, y el límite de 10° se puede
+  ampliar.
+- (b) Si hay cierres falsos, se deben a la mirada hacia abajo y no a la inclinación de la cabeza. Se ve en el bloque
+  «solo los ojos hacia abajo».
+
+**Datos.**
+- Un video guiado de S01 (`grabar_perclos.py --condicion postura`, 3 minutos), con la cámara de frente y sin gafas.
+- Seis posturas de 30 s; en cada una, unos 20 s con los ojos abiertos, 2 parpadeos pedidos y un cierre de 2 s:
+  - pantalla (referencia);
+  - cabeza un poco abajo (teclado);
+  - cabeza más abajo (celular en la mesa);
+  - solo los ojos abajo;
+  - cabeza un poco arriba;
+  - directo a la cámara.
+- Anotación ciega con B, M, O y X (guía v2).
+- Mismas clases que en E8 y E12:
+  - positivo: O;
+  - negativo: a más de 2 cuadros de cualquier B, M u O;
+  - X: excluido.
+- Los cuadros se agrupan por el cabeceo que mide el sistema respecto a la calibración, sumados a los cuadros de
+  Eyeblink8 de esos intervalos (E12).
+
+**Criterio.**
+- `POSE_MAX_PITCH_DOWN` pasa al mayor L ∈ {15°, 20°, 25°, 30°} tal que cada intervalo hacia abajo entre 10° y L
+  cumpla:
+  - falsos positivos por cuadro ≤ 1 %, con al menos 500 negativos;
+  - sensibilidad ≥ 0,80, con al menos 30 positivos.
+- Lo mismo hacia arriba por encima de 15° (`POSE_MAX_PITCH_UP`).
+- Un intervalo sin datos suficientes corta la ampliación ahí.
+
+**Se informan sin que decidan.**
+- Falsos positivos, sensibilidad y cabeceo mediano de cada bloque.
+- Los parpadeos contados por bloque.
+- Si el bloque «solo los ojos abajo» (cabeza a unos 0°) da más del 1 % de falsos positivos. En ese caso, la causa
+  es la mirada y un límite de cabeceo no la evita. Quedaría motivado otro experimento: validar la postura por la
+  posición vertical del iris.
+
+**Alcance.** Una persona, posturas voluntarias y ángulos medidos por el propio sistema (aproximados).
+
+**Renumeración.** La idea de rehacer la referencia cuando la postura cambia de forma sostenida (pendiente de E12)
+pasa a llamarse E14.
