@@ -494,6 +494,12 @@ demasiado. Pidió también una voz más activa. Todavía no se había grabado na
 - C1 a C4 no cambian. Con dos videos quedan 8 ventanas: el 90 % de C3 exige entonces las 8.
 - En lugar del «PERCLOS del minuto de trampas» se informan los falsos positivos por cuadro durante las trampas
   (tramos de `guia_voz.csv`).
+- Hubo una grabación de prueba con el guion de 6 minutos (`sin_gafas`, sesión 20261116_192312, commit e26c380),
+  detenida a los 3 minutos. Fue la que motivó el cambio. Se descarta: no se anota ni se analiza.
+- Un intento con gafas no llegó a grabar (0 cuadros). La aplicación Eyeblink, que arranca con Windows, tenía la
+  cámara. Se borró esa sesión vacía. Desde ahí, con la cámara en vivo, una lectura fallida ya no termina la
+  sesión: se reintenta hasta 10 s (`CAMERA_STALL_S`). Eso no cambia ninguna medida: el golden master sigue
+  idéntico.
 
 ## E10 — Cámara a un costado (criterio fijado el 2026-11-16, antes de grabar)
 

@@ -49,6 +49,11 @@ class FatigueMonitor(Thresholds):
 
     FASE_ROSTRO, FASE_CIERRE, FASE_REAPERTURA, FASE_MONITOREO = "rostro", "cierre", "reapertura", "monitoreo"
     FASE_MARCAS = "calibracion_manual"
+    # En vivo, una lectura fallida de la cámara suele ser pasajera: otro programa la tomó un momento (sesión
+    # 20261116_194404, la app Eyeblink) o el driver se reinició. Se reintenta, reabriéndola cada CAMERA_REOPEN_S, hasta
+    # CAMERA_STALL_S antes de terminar. El hueco no falsea PERCLOS: cada cuadro pesa como mucho 0,2 s (fatigue_perclos).
+    CAMERA_STALL_S = 10.0
+    CAMERA_REOPEN_S = 2.5
 
     def __init__(self, video_source=0, subject_id="anonimo", condition=None, save_trace=True, sessions_dir="sesiones",
                  subject_code=None, manual_marks=None, record=False, kss_interval_min=None, alert_sound=True,
@@ -403,6 +408,26 @@ class FatigueMonitor(Thresholds):
                   f"obtenida {actual[0]}x{actual[1]}{note}")
         return actual
 
+    def _wait_for_camera(self, cap, window, open_capture=cv2.VideoCapture):
+        """La cámara en vivo dejó de dar imágenes: reintenta hasta CAMERA_STALL_S, reabriéndola cada CAMERA_REOPEN_S.
+        Devuelve (imagen, cap) si vuelve, o (None, cap) si no."""
+        print("[CAMARA] No llegan imágenes de la cámara: reintentando...")
+        start = last_open = time.time()
+        while window.is_open() and time.time() - start < self.CAMERA_STALL_S:
+            if time.time() - last_open >= self.CAMERA_REOPEN_S:
+                cap.release()
+                cap = open_capture(self.video_source)
+                self._configure_camera(cap)
+                last_open = time.time()
+            success, img = cap.read()
+            if success:
+                print(f"[CAMARA] La cámara volvió tras {time.time() - start:.1f} s sin imágenes.")
+                return img, cap
+            time.sleep(0.1)
+        print(f"[CAMARA] La cámara no dio imágenes en {self.CAMERA_STALL_S:.0f} s. Suele pasar cuando otro programa la "
+              "está usando (navegador, Teams, Zoom, la app Cámara, Eyeblink...): ciérralo y vuelve a empezar.")
+        return None, cap
+
     def start(self):
         if self.kss and self._is_video_file():
             print("[AVISO] --kss es para sesiones en vivo (la persona responde en el momento). Se ignora.")
@@ -439,10 +464,13 @@ class FatigueMonitor(Thresholds):
             if not window.is_open():         # cerrada con la X
                 break
             success, img = cap.read()
+            if not success and not self._is_video_file():
+                img, cap = self._wait_for_camera(cap, window)
+                success = img is not None
             if not success:
                 break
 
-            self._now = self.frames_total / native_fps if use_video_clock else time.time() - wall_start
+            self._now =self.frames_total / native_fps if use_video_clock else time.time() - wall_start
             self.frames_total += 1
             self.session.tick()
             if self._manual_pending and self.frames_total - 1 >= calibration_marks.frame_ranges(self.manual_marks)[4]:

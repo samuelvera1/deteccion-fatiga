@@ -82,6 +82,10 @@ RETRY_CUE = "No te vi los ojos cerrados. Ábrelos; en unos segundos te pido cerr
 RETRY_AGAIN_CUE = "Ciérralos otra vez, del todo, hasta oír el pitido."
 MEASURED_CUE = "Listo. Abre los ojos."
 RESERVE_CUE = "No se midió el ojo cerrado. Pulsa Q y empieza de nuevo."
+# Cortes de la cámara (fatigue_framework._wait_for_camera): otro programa la tomó o el driver se reinició
+CAMERA_CUES = (("[CAMARA] No llegan", "Se cortó la cámara. Espera un momento."),
+               ("[CAMARA] La cámara volvió", "Ya volvió la cámara. Sigue."),
+               ("[CAMARA] La cámara no dio", "La cámara no responde. Cierra los programas que la usen y empieza de nuevo."))
 
 # Lee líneas en base64 (UTF-8) por la entrada estándar y las dice con la primera voz en español instalada
 _SPEAKER_PS = r"""
@@ -210,13 +214,20 @@ def main(argv=None):
     proc = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
     stop, guide, said, timers = threading.Event(), None, [], []
-    session_dir, reserve, recalibrated = None, False, False
+    session_dir, reserve, recalibrated, camera_gaps, camera_lost = None, False, False, [], False
     for raw in proc.stdout:
         line = raw.decode("utf-8", "replace").rstrip("\r\n")
         log(line)
         found = re.match(r"\[SESION\] \S+ -> (.+)$", line) or re.search(r"Datos guardados en '(.+)'", line)
         if found and session_dir is None:
             session_dir = os.path.join(HERE, found.group(1))     # main.py corre en HERE: rutas relativas a HERE
+        for prefix, text in CAMERA_CUES:
+            if line.startswith(prefix):
+                speaker.say(text)
+        gap = re.search(r"\[CAMARA\] La cámara volvió tras (\d+(?:\.\d+)?) s", line)
+        if gap and guide is not None:
+            camera_gaps.append((said[-1][0] if said else 0.0, float(gap.group(1))))
+        camera_lost = camera_lost or line.startswith("[CAMARA] La cámara no dio")
         if guide is not None:
             if "[MONITOREO]" in line:
                 recalibrated = True
@@ -254,7 +265,9 @@ def main(argv=None):
     print("\n" + "=" * 50)
     last = said[-1][0] if said else None
     if guide is None:
-        print("El programa terminó antes de empezar a medir: no hay video del guion.")
+        print("El programa terminó antes de empezar a medir: no hay video del guion"
+              + (" (la cámara no dio imágenes; mira el aviso [CAMARA] de arriba)." if camera_lost else ".")
+              + " Esa sesión quedó vacía: no sirve para anotar.")
     elif last is None or last < END_CUE_S:
         print(f"[AVISO] El programa terminó en el minuto {_clock(last or 0.0)} del guion, antes del final: "
               "repite la grabación si faltó algún bloque.")
@@ -270,7 +283,10 @@ def main(argv=None):
         print("[AVISO] El ojo cerrado no se midió en la calibración: según E9 esta grabación no sirve; repítela.")
     if recalibrated:
         print("[AVISO] Hubo una recalibración durante el guion.")
-    if session_dir:
+    for t, seconds in camera_gaps:
+        print(f"[AVISO] La cámara se cortó {seconds:.1f} s cerca del minuto {_clock(t)} del guion"
+              + (": ese minuto puede quedar sin los 54 s válidos; repite la grabación." if seconds > 5.0 else "."))
+    if session_dir and guide is not None:
         print(f"Sesión: {session_dir}\nSiguiente paso, anotarla en modo ciego (docs/guia_anotacion.md):\n"
               f'  .\\venv\\Scripts\\python.exe revisar.py "{session_dir}" --ciego')
     return proc.returncode
