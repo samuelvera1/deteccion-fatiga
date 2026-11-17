@@ -15,21 +15,24 @@ Los cuatro con la misma persona, el mismo día y la misma luz:
 | 3 | `lateral_30` | a un costado, a unos 30° | E10 |
 | 4 | `lateral_45` | al otro costado, a unos 45° | E10 |
 
-**Cámara de lado (videos 3 y 4).** Tú miras de frente a lo que lees, como cuando trabajas, y la cámara queda a un
-costado apuntando a tu cara. Para poner el ángulo sin transportador, con la cámara a la misma distancia de ti que lo
-que lees:
-- 30°: la cámara corrida hacia el lado algo más de la mitad de esa distancia (si lees a 60 cm, unos 35 cm al lado).
+**Cámara de lado (videos 3 y 4).** Tú miras de frente, como cuando trabajas, y la cámara queda a un costado
+apuntando a tu cara. Para poner el ángulo sin transportador, con la cámara a la misma distancia de ti que el punto
+al que miras:
+- 30°: la cámara corrida hacia el lado algo más de la mitad de esa distancia (a 60 cm, unos 35 cm al lado).
 - 45°: la cámara corrida hacia el lado lo mismo que esa distancia (a 60 cm, unos 60 cm al lado).
 
-Con un portátil, ponlo de lado mirando hacia ti y lee de frente en otra pantalla o en una hoja impresa. Con una
-cámara USB o el celular como cámara, muévela tú (`--fuente 1` si no es la cámara 0). No hace falta exactitud: el
+Con un portátil, ponlo de lado mirando hacia ti y mira de frente a otra pantalla o a un punto fijo, por ejemplo un
+papel pegado a la pared a la altura de los ojos. Con una cámara USB o el celular como cámara, muévela tú
+(`--fuente 1` si no es la cámara 0). No hace falta exactitud: el
 programa mide el ángulo real de la cara respecto a la cámara (`camara_yaw_grados` en el resumen de la sesión).
 
 ## Antes de grabar
 
 - Luz normal de oficina, **de frente** (no detrás de ti), a la distancia habitual. Con gafas, baja el brillo de la
   pantalla o inclínala hasta que no se refleje en los lentes: en el video con gafas los reflejos tapaban los ojos.
-- Un texto para leer y el celular a mano.
+- No hace falta leer nada. Entre una indicación y otra, mira la pantalla como cuando la usas: la ventana del
+  programa o un video sin sonido (el sonido taparía la voz). Parpadea normal, sin forzar ni aguantar.
+- El celular a mano, para cuando la voz diga «Mira el celular».
 - Con los ojos cerrados, **la cabeza quieta**: bajarla más de 10° deja esos segundos sin datos válidos, y con más
   de 6 s así el minuto se queda sin los 54 s que exige la alerta («Reuniendo datos 52 de 54 s»).
 - **Guía de voz** (`grabar_perclos.py`). La voz te guía la calibración y, cuando el programa empieza a medir, cada
