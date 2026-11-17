@@ -683,3 +683,5 @@ sensibilidad 0,878 y falsos positivos 0,06 %.
 - (2) Los videos desplazados hacia abajo (02_0, 02_10, 04_10) siguen casi sin alerta. Lo de fondo no es el ancho del
   rango, sino que la referencia de la calibración deja de representar la postura de trabajo. Hipótesis para E13:
   rehacer la referencia, y la apertura del ojo abierto, cuando la postura cambia de forma sostenida.
+- Versiones dentro de E9 y E10: el video con gafas se grabó con la regla anterior (commit 2923ece). Los que faltan se
+  graban con esta. El commit queda en los metadatos de cada sesión y los resultados se informan por video.
