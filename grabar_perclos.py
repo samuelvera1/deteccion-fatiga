@@ -140,6 +140,12 @@ RETRY_CUE = "No te vi los ojos cerrados. Ábrelos; en unos segundos te pido cerr
 RETRY_AGAIN_CUE = "Ciérralos otra vez, del todo, hasta oír el pitido."
 MEASURED_CUE = "Listo. Abre los ojos."
 RESERVE_CUE = "No se midió el ojo cerrado. Pulsa Q y empieza de nuevo."
+# E10: con la cámara de lado, no medir el ojo cerrado es un resultado; el video completo sirve para la variante
+# «solo el ojo cercano» (reanálisis sin conexión), así que se sigue con el guion
+RESERVE_LATERAL_CUE = "No se midió el ojo cerrado. Sigue con el guion igual: sirve para analizarlo después."
+# Paso 1 lento (con la cámara de lado la malla tiembla y la puerta de estabilidad tarda): ánimo cada STEP1_HINT_S
+STEP1_HINT_S = 10.0
+STEP1_HINT_CUE = "Sigue quieto, mirando tu punto. Con la cámara de lado la calibración tarda un poco más."
 # Cortes de la cámara (fatigue_framework._wait_for_camera): otro programa la tomó o el driver se reinició
 CAMERA_CUES = (("[CAMARA] No llegan", "Se cortó la cámara. Espera un momento."),
                ("[CAMARA] La cámara volvió", "Ya volvió la cámara. Sigue."),
@@ -386,7 +392,12 @@ def main(argv=None):
     log(f"[GUIA] Abriendo el programa. La voz te guía la calibración y el guion ({script[-1][0] / 60:.0f} minutos).")
     proc = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
-    stop, guide, said, timers = threading.Event(), None, [], []
+    stop, guide, said, timers, step1_done = threading.Event(), None, [], [], threading.Event()
+    lateral = args.condicion in TARGET_ANGLES
+
+    def step1_hints():
+        while not step1_done.wait(STEP1_HINT_S) and proc.poll() is None:
+            speaker.say(STEP1_HINT_CUE)
     session_dir, reserve, recalibrated, camera_gaps, camera_lost = None, False, False, [], False
     for raw in proc.stdout:
         line = raw.decode("utf-8", "replace").rstrip("\r\n")
@@ -409,6 +420,10 @@ def main(argv=None):
         for prefix, text in CALIBRATION_CUES:
             if line.startswith(prefix):
                 speaker.say(text)
+        if line.startswith("[SESION]"):
+            threading.Thread(target=step1_hints, daemon=True).start()
+        if line.startswith("[PASO 1] Perfil fijado"):
+            step1_done.set()
         if line.startswith("[PASO 2] No se detectaron"):
             speaker.say(RETRY_CUE)
             pause = re.search(r" en (\d+(?:\.\d+)?) s", line)
@@ -419,8 +434,13 @@ def main(argv=None):
         if line.startswith("[PASO 2] Ojo cerrado:"):
             if "RESERVA" in line:
                 reserve = True
-                speaker.say(RESERVE_CUE)
-                log("[GUIA] La calibración no midió el ojo cerrado: pulsa Q y vuelve a empezar (E9 exige repetirla).")
+                if lateral:
+                    speaker.say(RESERVE_LATERAL_CUE)
+                    log("[GUIA] La calibración no midió el ojo cerrado. Sigue con el guion: en E10 es un resultado y "
+                        "el video completo sirve para probar después la variante del ojo cercano.")
+                else:
+                    speaker.say(RESERVE_CUE)
+                    log("[GUIA] La calibración no midió el ojo cerrado: pulsa Q y vuelve a empezar (E9 exige repetirla).")
             else:
                 speaker.say(MEASURED_CUE)
         if "[MONITOREO]" in line:
@@ -429,6 +449,7 @@ def main(argv=None):
             guide.start()
     proc.wait()
     stop.set()
+    step1_done.set()
     for timer in timers:
         timer.cancel()
     if guide is not None:
@@ -457,7 +478,10 @@ def main(argv=None):
         if os.path.isfile(meta_path):
             with open(meta_path, encoding="utf-8") as f:
                 measured = json.load(f).get("resumen", {}).get("ojo_cerrado_medido")
-    if reserve or measured is False:
+    if (reserve or measured is False) and lateral:
+        print("[AVISO] El ojo cerrado no se midió en la calibración. En E10: si es la segunda vez a este ángulo, ese es "
+              "el resultado (no utilizable a este ángulo); si es la primera, se repite una vez.")
+    elif reserve or measured is False:
         print("[AVISO] El ojo cerrado no se midió en la calibración: según E9 esta grabación no sirve; repítela.")
     if recalibrated:
         print("[AVISO] Hubo una recalibración durante el guion.")

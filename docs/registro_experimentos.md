@@ -763,3 +763,27 @@ Diagnóstico, que no decide nada:
 
 **Renumeración.** La idea de rehacer la referencia cuando la postura cambia de forma sostenida (pendiente de E12)
 pasa a llamarse E14.
+
+**E10, intentos a 45° (2026-11-16).**
+
+| Sesión | Cámara colocada | Qué pasó |
+|---|---|---|
+| 20261116_211249 | 49,2° | El paso 1 (postura estable) no terminó en 25 s y la persona lo detuvo. La malla tiembla a ese ángulo y la puerta de estabilidad casi nunca llega a 15 cuadros seguidos. |
+| 20261116_211427 | 47,0° (−41,9° en la calibración) | El ojo cerrado no se midió en los 3 intentos del programa y usó la reserva. Detenida a los 49 s. |
+
+Con los ojos cerrados, la apertura medida baja menos cuanto más de lado está la cámara. Valor mínimo durante el paso
+de ojos cerrados, sobre la apertura normal:
+
+| Video | Ángulo | Mínimo |
+|---|---|---|
+| sin gafas | −1,6° | 0,11 |
+| lateral | 30,7° | 0,41 |
+| con gafas | 2,4° | 0,53 |
+| lateral | −41,9° | 0,60 |
+
+La captura exige bajar de 0,6 durante 0,5 s: a 45° el cierre casi no se distingue de un ojo abierto en la malla.
+
+Según el criterio de E10, la grabación a 45° se repite una vez. Si vuelve a fallar, el resultado es que a 45° el
+sistema no es utilizable. Para esa repetición, la guía ya no pide pulsar Q cuando falla la medida del ojo cerrado en
+los videos de lado: pide seguir con el guion. Así queda el video completo para probar sin conexión la variante
+pre-registrada en E10 (usar solo el ojo cercano), con calibración manual por marcas.
