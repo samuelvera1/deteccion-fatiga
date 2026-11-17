@@ -27,6 +27,7 @@ científico y una monografía** (Universidad de la Costa). Autor: S01 en los doc
   `fatigue_profile.py` (calibración), `fatigue_eyes.py`, `fatigue_perclos.py`, `fatigue_alert.py`, `fatigue_config.py`.
 - Herramientas: `grabar_perclos.py` (guía de voz para E9/E10/E13), `revisar.py` (anotación; N/P saltan a eventos
   pedidos por la voz), `evaluar.py` (sistema contra anotación, incluido PERCLOS por cuadro y por minuto).
+- `docs/contexto_sesiones.md`: resumen de decisiones y lecciones de las sesiones anteriores.
 - `docs/registro_experimentos.md`: **la fuente de verdad** de todos los experimentos (E1–E14b) con criterios y
   resultados. `docs/guion_perclos.md`, `docs/guia_anotacion.md`, `docs/LEEME_ejecutable.txt`.
 - `analisis/`: scripts de los experimentos recientes (E8, E12, E14, E14b, ángulos de los datasets, revisión de
