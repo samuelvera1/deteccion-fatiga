@@ -588,3 +588,49 @@ cabecear es un signo de sueño, y el sistema se queda sin decir nada justo enton
 
 **Relación con E1.** Sigue pendiente el experimento controlado que pidió E1: cabeza inclinada a ángulos conocidos.
 Solo ese experimento puede decir si el límite de ±10° se puede ampliar.
+
+## E12 — Rango de cabeceo válido para PERCLOS (criterio fijado el 2026-11-16, antes de calcular)
+
+**Motivación.**
+- Al revisar UTA-RLDD, la persona que dirige el proyecto vio a muchos participantes «fuera de rango» en posturas
+  naturales.
+- La regla de ±10° de cabeceo se basó en una sola sesión, y E1 dejó su base marcada como débil.
+- En el video con gafas de E9, un cabeceo de 11° bloqueó la alerta un minuto.
+- El riesgo de ampliar el rango es el contrario: al mirar hacia abajo, el párpado baja con la mirada y el ojo puede
+  parecer cerrado (falso positivo).
+
+**Hipótesis.** Entre 10° y 20-30° de cabeceo, el estado de ojo cerrado (cierre ≥ 0,80) es tan fiable como dentro de
+±10°, así que el rango se puede ampliar sin falsear PERCLOS.
+
+**Datos que deciden.**
+- Eyeblink8: los 8 videos procesados para E8 (`eval_eyeblink8_v2`), con la anotación por cuadro.
+- Las mismas clases que en E8:
+  - positivo: los dos ojos totalmente cerrados;
+  - negativo: a más de 2 cuadros de un parpadeo;
+  - intermedio: excluido.
+- El mismo nivel de ojo cerrado que en E8 (principal: la mediana de los otros videos).
+- Esta vez entran también los cuadros con la postura fuera de rango.
+- Los cuadros se agrupan por |cabeceo| respecto a la calibración: 0-10° (referencia), 10-15°, 15-20°, 20-25° y
+  25-30°.
+- Solo entran cuadros con |giro| ≤ 40°, el límite actual, para aislar el cabeceo.
+- Se excluyen los cuadros con algún ojo no visible.
+
+**Criterio.**
+- Se amplía `POSE_MAX_PITCH` al mayor límite L ∈ {15°, 20°, 25°, 30°} tal que cada intervalo entre 10° y L cumpla:
+  - falsos positivos por cuadro ≤ 1 %, con al menos 500 negativos;
+  - el mismo ≤ 1 % en cada sentido (cabeza arriba y cabeza abajo) que tenga al menos 500 negativos;
+  - sensibilidad ≥ 0,80, con al menos 30 positivos.
+- Un intervalo sin datos suficientes corta la ampliación ahí.
+- Si 10-15° no cumple, se mantiene ±10°.
+
+**Se informan sin que decidan.**
+- En UTA-RLDD (24 videos de E4b, posturas naturales de unos 10 minutos):
+  - el porcentaje de tiempo fuera de rango, por eje;
+  - el porcentaje de tiempo sin alerta posible (ventana con menos de 54 s válidos), con el límite actual y con el
+    que resulte.
+- La mediana del cabeceo de cada video, para ver si la referencia de la calibración quedó atípica (persona que se
+  acomoda después de calibrar).
+
+**Alcance.**
+- Eyeblink8 son 4 personas alertas frente a un portátil.
+- Dice si la medida del ojo cerrado aguanta esos ángulos, no cómo se comporta un cabeceo de sueño real.
