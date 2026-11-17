@@ -88,3 +88,25 @@ class GuideScriptTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CameraPlacementTest(unittest.TestCase):
+    def test_camera_yaw_of_a_turned_face(self):
+        from tests.test_fatigue_pose import face, rot_y
+        for deg in (0.0, 30.0, -45.0):
+            self.assertAlmostEqual(g.camera_yaw(face(rot_y(deg))), abs(deg), places=6)
+
+    def test_feedback_guides_toward_the_target(self):
+        self.assertEqual(g.angle_feedback(None, 30.0)[0], False)
+        inside, phrase = g.angle_feedback(18.4, 30.0)
+        self.assertFalse(inside)
+        self.assertIn("más hacia el lado", phrase)
+        self.assertIn("18 grados", phrase)
+        self.assertIn("menos", g.angle_feedback(52.0, 45.0)[1])
+        self.assertTrue(g.angle_feedback(33.0, 30.0)[0])
+        self.assertTrue(g.angle_feedback(41.0, 45.0)[0])
+
+    def test_targets_and_source(self):
+        self.assertEqual(g.TARGET_ANGLES, {"lateral_30": 30.0, "lateral_45": 45.0})
+        self.assertEqual(g._source_from([]), 0)
+        self.assertEqual(g._source_from(["--fuente", "1"]), 1)

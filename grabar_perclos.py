@@ -10,6 +10,9 @@ Uso (PowerShell, en la carpeta del proyecto):
     .\\venv\\Scripts\\python.exe grabar_perclos.py --probar-voz
     .\\venv\\Scripts\\python.exe grabar_perclos.py --sujeto S01 --condicion sin_gafas
     .\\venv\\Scripts\\python.exe grabar_perclos.py --sujeto S01 --condicion con_gafas
+    .\\venv\\Scripts\\python.exe grabar_perclos.py --sujeto S01 --condicion lateral_30
+En los videos de lado (lateral_30, lateral_45), antes de grabar la voz dice en vivo a cuántos grados queda la cara
+respecto a la cámara hasta que llega al objetivo (--sin-colocar se lo salta).
 Cualquier otra opción se pasa tal cual a main.py (ej. --fuente 1 para otra cámara).
 """
 import argparse
@@ -32,6 +35,11 @@ COUNTDOWN = ("Tres.", "Dos.", "Uno.")
 SQUINT = ("Entrecierra los ojos, sin cerrarlos.", "Normal.")
 # E9: cámara de frente, sin y con gafas. E10: cámara a un costado, a unos 30 y 45 grados de la dirección en que miras
 CONDITIONS = ("sin_gafas", "con_gafas", "lateral_30", "lateral_45")
+# Colocación de la cámara en los videos de lado: la voz dice el ángulo en vivo hasta que queda en el objetivo
+TARGET_ANGLES = {"lateral_30": 30.0, "lateral_45": 45.0}
+ANGLE_TOLERANCE = 5.0           # grados
+ANGLE_HOLD_S = 3.0              # tiempo seguido dentro del objetivo para darlo por colocado
+ANGLE_SPEAK_EVERY_S = 3.5
 
 
 def _closure(t, seconds):
@@ -191,6 +199,106 @@ def save_cues(session_dir, said):
         writer.writerows(said)
 
 
+def camera_yaw(face3d):
+    """Giro de la cara respecto a la cámara, en grados y sin signo (0 = de frente). Misma fórmula que
+    HeadPoseTracker.camera_angles (camara_yaw_grados del resumen). Aproximado: la z de MediaPipe es estimada."""
+    import numpy as np
+
+    import fatigue_geometry
+    axes = fatigue_geometry.face_axes(face3d)
+    return None if axes is None else abs(float(np.degrees(np.arctan2(axes[0, 2], axes[2, 2]))))
+
+
+def angle_feedback(angle, target, tolerance=ANGLE_TOLERANCE):
+    """(dentro del objetivo, frase de la voz) para un ángulo medido (None = no se ve la cara)."""
+    if angle is None:
+        return False, "No te veo la cara. Apunta la cámara hacia ti."
+    if angle < target - tolerance:
+        return False, f"{angle:.0f} grados. Corre la cámara más hacia el lado."
+    if angle > target + tolerance:
+        return False, f"{angle:.0f} grados. Un poco menos."
+    return True, f"{angle:.0f} grados. Ahí está. Quédate quieto."
+
+
+def position_camera(speaker, target, source, log, max_s=None):
+    """Antes de un video de lado: mide en vivo el giro de la cara respecto a la cámara y guía con la voz hasta que
+    quede en target ± ANGLE_TOLERANCE durante ANGLE_HOLD_S. Enter o espacio aceptan el ángulo actual; Q cancela.
+    Devuelve el ángulo aceptado, o None si se canceló."""
+    import statistics
+    from collections import deque
+
+    import cv2
+
+    from fatigue_core import FaceMeshDetector
+    detector = FaceMeshDetector(maxFaces=1, minDetectionCon=0.6, minTrackCon=0.6, refineLandmarks=True)
+    cap = cv2.VideoCapture(source)
+    window = "Colocar la camara"
+    intro = (f"Vamos a poner la cámara a {target:.0f} grados. Mira de frente a tu punto, no a la cámara, "
+             "y corre la cámara hacia un lado hasta que te diga listo.")
+    speaker.say(intro)
+    log(f"[CAMARA] Colocando la cámara a {target:.0f}° (± {ANGLE_TOLERANCE:.0f}). Mira de frente a tu punto, no a la "
+        "cámara. Enter acepta el ángulo actual; Q cancela.")
+    recent, inside_since, result = deque(maxlen=15), None, None
+    start = time.monotonic()
+    next_say = start + 0.5 + 0.07 * len(intro)      # deja terminar la explicación (~0,07 s por carácter, medido)
+    failures = 0
+    try:
+        while max_s is None or time.monotonic() - start < max_s:
+            ok, img = cap.read()
+            if not ok:
+                failures += 1
+                if failures > 50:
+                    log("[CAMARA] La cámara no da imágenes: ciérrala en otros programas y vuelve a empezar.")
+                    return None
+                time.sleep(0.1)
+                continue
+            failures = 0
+            _, faces = detector.findFaceMesh(img, draw=False)
+            angle = camera_yaw(detector.faces3d[0]) if faces else None
+            if angle is not None:
+                recent.append(angle)
+            elif recent:
+                recent.popleft()
+            smooth = statistics.median(recent) if len(recent) >= 5 else None
+            inside, phrase = angle_feedback(smooth, target)
+            now = time.monotonic()
+            inside_since = (inside_since or now) if inside else None
+            label = "sin cara" if smooth is None else f"{smooth:.0f} grados (objetivo {target:.0f})"
+            color = (80, 200, 80) if inside else (0, 160, 255)
+            cv2.rectangle(img, (0, 0), (img.shape[1], 70), (30, 30, 30), -1)
+            cv2.putText(img, label, (20, 48), cv2.FONT_HERSHEY_SIMPLEX, 1.4, color, 3)
+            cv2.imshow(window, img)
+            key = cv2.waitKey(1) & 0xFF
+            if key in (ord("q"), ord("Q"), 27):
+                speaker.say("Cancelado.")
+                return None
+            if key in (13, 32) and smooth is not None:
+                result = smooth
+                break
+            if inside_since is not None and now - inside_since >= ANGLE_HOLD_S:
+                result = smooth
+                break
+            if now >= next_say:
+                speaker.say(phrase)
+                next_say = now + ANGLE_SPEAK_EVERY_S
+    finally:
+        cap.release()
+        cv2.destroyWindow(window)
+    if result is not None:
+        speaker.say(f"Listo, {result:.0f} grados. Deja la cámara ahí.")
+        log(f"[CAMARA] Cámara colocada: la cara queda a {result:.0f}° de la cámara.")
+        time.sleep(3.0)
+    return result
+
+
+def _source_from(extra):
+    """Valor de --fuente entre las opciones que pasan a main.py (0 si no se indica)."""
+    if "--fuente" in extra and extra.index("--fuente") + 1 < len(extra):
+        value = extra[extra.index("--fuente") + 1]
+        return int(value) if value.isdigit() else value
+    return 0
+
+
 def test_voice(speaker):
     cues = [(0.0, "Prueba de voz.")] + _closure(4.0, 2.0) + [(7.5, "Si me oyes bien, todo listo.")]
     t0 = time.monotonic()
@@ -205,6 +313,8 @@ def main(argv=None):
     parser.add_argument("--sujeto", default="S01", help="código anónimo del participante (por defecto S01)")
     parser.add_argument("--condicion", choices=CONDITIONS, help="condición del video (E9: gafas; E10: cámara de lado)")
     parser.add_argument("--probar-voz", action="store_true", help="solo prueba la voz y el volumen, sin grabar")
+    parser.add_argument("--sin-colocar", action="store_true",
+                        help="en los videos de lado, no guiar la colocación de la cámara (ya está puesta)")
     args, extra = parser.parse_known_args(argv)
     if not args.probar_voz and not args.condicion:
         parser.error("indica --condicion (" + ", ".join(CONDITIONS) + ")")
@@ -228,6 +338,14 @@ def main(argv=None):
         test_voice(speaker)
         speaker.close()
         return 0
+
+    placed = None
+    if args.condicion in TARGET_ANGLES and not args.sin_colocar:
+        placed = position_camera(speaker, TARGET_ANGLES[args.condicion], _source_from(extra), log)
+        if placed is None:
+            speaker.close()
+            print("[GUIA] Colocación cancelada: no se grabó nada.")
+            return 1
 
     cmd = [sys.executable, "-u", os.path.join(HERE, "main.py"), "--sujeto", args.sujeto,
            "--condicion", args.condicion, "--grabar", "--sin-sonido", *extra]
@@ -301,6 +419,11 @@ def main(argv=None):
     if session_dir and os.path.isdir(session_dir):
         if said:
             save_cues(session_dir, said)
+        if placed is not None:
+            with open(os.path.join(session_dir, "posicion_camara.json"), "w", encoding="utf-8") as f:
+                json.dump({"objetivo_grados": TARGET_ANGLES[args.condicion], "medido_al_colocar_grados": round(placed, 1),
+                           "nota": "giro de la cara respecto a la cámara mirando de frente; aproximado (z estimada)"},
+                          f, ensure_ascii=False, indent=1)
         meta_path = os.path.join(session_dir, "metadata.json")
         if os.path.isfile(meta_path):
             with open(meta_path, encoding="utf-8") as f:

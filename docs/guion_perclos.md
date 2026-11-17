@@ -16,15 +16,19 @@ Los cuatro con la misma persona, el mismo día y la misma luz:
 | 4 | `lateral_45` | al otro costado, a unos 45° | E10 |
 
 **Cámara de lado (videos 3 y 4).** Tú miras de frente, como cuando trabajas, y la cámara queda a un costado
-apuntando a tu cara. Para poner el ángulo sin transportador, con la cámara a la misma distancia de ti que el punto
-al que miras:
-- 30°: la cámara corrida hacia el lado algo más de la mitad de esa distancia (a 60 cm, unos 35 cm al lado).
-- 45°: la cámara corrida hacia el lado lo mismo que esa distancia (a 60 cm, unos 60 cm al lado).
-
-Con un portátil, ponlo de lado mirando hacia ti y mira de frente a otra pantalla o a un punto fijo, por ejemplo un
-papel pegado a la pared a la altura de los ojos. Con una cámara USB o el celular como cámara, muévela tú
-(`--fuente 1` si no es la cámara 0). No hace falta exactitud: el
-programa mide el ángulo real de la cara respecto a la cámara (`camara_yaw_grados` en el resumen de la sesión).
+apuntando a tu cara.
+- **No hace falta medir el ángulo.** Con `--condicion lateral_30` o `lateral_45`, antes de grabar se abre la imagen
+  de la cámara y la voz dice en vivo a cuántos grados quedas («18 grados, corre la cámara más hacia el lado»…).
+- Tú miras de frente a tu punto, no a la cámara, y mueves la cámara hasta que la voz diga «Listo». Eso pasa cuando
+  llevas 3 s dentro de ± 5° del objetivo.
+- Enter acepta el ángulo del momento y Q cancela.
+- El ángulo usa la misma medida que `camara_yaw_grados`. Es aproximado, porque la profundidad de MediaPipe es
+  estimada. Queda en `posicion_camara.json` dentro de la sesión.
+- Con un portátil, ponlo de lado mirando hacia ti y mira de frente a otra pantalla o a un punto fijo, por ejemplo un
+  papel pegado a la pared a la altura de los ojos.
+- Con una cámara USB o el celular como cámara, muévela tú (`--fuente 1` si no es la cámara 0).
+- Referencia sin programa, si la cámara está a la misma distancia que tu punto (por ejemplo 60 cm): a 30° queda
+  unos 35 cm hacia el lado; a 45°, unos 60 cm.
 
 ## Antes de grabar
 
