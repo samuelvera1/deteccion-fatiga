@@ -84,6 +84,11 @@ ANNOTATION_HEADER = ["t_s", "frame", "tipo", "fin_t_s", "fin_frame", "comentario
 LONG_BLINK_NOTICE_S = 1.0         # guía: con los ojos cerrados 1 s o más es un cierre largo (M), no un parpadeo
 NAVIGATION_KEYS = ("Moverse", [(["Espacio"], "Reproducir / pausar"), (["A", "D"], "± 1 frame"),
                                (["J", "L"], "± 1 segundo"), (["Clic"], "Saltar (en la barra)")])
+# Sesiones grabadas con la guía de voz (grabar_perclos.py): N/P saltan a cada parpadeo o cierre que pidió la voz
+# (guia_voz.csv). Vienen del guion, no del sistema, así que se pueden usar en modo ciego.
+CUE_TEXTS = {"Haz un parpadeo.", "Otro parpadeo.", "Uno más.", "Tres parpadeos seguidos.", "Parpadea.",
+             "Parpadeo lento.", "Cierra."}
+CUE_LEAD_S = 0.5                  # el salto cae un poco antes de la orden, para ver el ojo abierto antes
 
 
 def safe_name(text):
@@ -690,6 +695,7 @@ class SessionReviewer(Viewer):
                      f"{'SIN' if blind else 'EN'} modo ciego: la referencia y la revisión no se mezclan.")
         self.pending = None             # intervalo con inicio marcado y sin fin
         self.comment_for, self.comment_text = None, ""   # anotación cuyo comentario se está escribiendo
+        self.cues = self._load_cues()   # frames de lo que pidió la guía de voz (vacío sin guia_voz.csv)
         self._edits = 0                 # cambios en las anotaciones (para redibujar su tarjeta)
 
     # ------------------------------------------------------------------ datos
@@ -713,6 +719,31 @@ class SessionReviewer(Viewer):
                     duration = float(r["Duracion_s"]) if r.get("Duracion_s") else 0.0
                     events.append((end - duration, end, r["Evento"]))
         return events
+
+    def _frame_at(self, t):
+        if self.frame_times:
+            return max(0, bisect.bisect_left(self.frame_times, t))
+        return max(0, int(round(t * self.fps)))
+
+    def _load_cues(self):
+        """Frames (un poco antes) de cada parpadeo o cierre que pidió la guía de voz, en orden."""
+        path = os.path.join(self.dir, "guia_voz.csv")
+        start = (self.meta.get("resumen") or {}).get("inicio_monitoreo_s")
+        if not os.path.exists(path) or start is None:
+            return []
+        with open(path, newline="", encoding="utf-8") as f:
+            times = [start + float(r["t_real_s"]) - CUE_LEAD_S for r in csv.DictReader(f) if r["texto"] in CUE_TEXTS]
+        return sorted({self._frame_at(t) for t in times})
+
+    def jump_to_cue(self, forward):
+        """N / P: al siguiente o al anterior evento pedido por la voz."""
+        if forward:
+            target = next((f for f in self.cues if f > self.pos), None)
+        else:
+            target = next((f for f in reversed(self.cues) if f < self.pos), None)
+        if target is not None:
+            self.playing = False
+            self.seek(target)
 
     def _load_annotations(self):
         if not os.path.exists(self.annotations_path):
@@ -759,6 +790,9 @@ class SessionReviewer(Viewer):
                 return True
             else:
                 self._add_annotation(kind, self.pos, None)
+        elif key in (ord("n"), ord("p")) and self.cues:
+            self.jump_to_cue(key == ord("n"))
+            return True
         elif key == ord("u"):
             if self.pending is not None:
                 self.pending = None                                 # cancela el intervalo a medio marcar
@@ -979,7 +1013,10 @@ class SessionReviewer(Viewer):
         return self.card(c, y, title, [(40, box), (20, example), (24, keys)])
 
     def key_sections(self):
-        return [NAVIGATION_KEYS,
+        navigation = NAVIGATION_KEYS
+        if self.cues:
+            navigation = (NAVIGATION_KEYS[0], NAVIGATION_KEYS[1] + [(["N", "P"], "Evento pedido por la voz")])
+        return [navigation,
                 ("Anotar: la tecla al inicio y otra vez al final",
                  [(["B"], "Parpadeo"), (["Y"], "Bostezo"), (["K"], "Micro-bostezo"), (["M"], "Cierre largo ≥ 1 s"),
                   (["O"], "Ojo cerrado"), (["X"], "No evaluable" if self.blind else "Problema")]),

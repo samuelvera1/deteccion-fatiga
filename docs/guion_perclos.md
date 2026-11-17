@@ -100,9 +100,13 @@ cabeza sin que el sistema vea cierres falsos (criterio de E13 en el registro).
    .\venv\Scripts\python.exe revisar.py "sesiones\<sesión>" --ciego
    ```
 
+   - **N / P** saltan al siguiente o al anterior parpadeo o cierre que pidió la voz, medio segundo antes. Vienen
+     del guion, no del sistema, así que se pueden usar en modo ciego.
    - Primera pasada: B (parpadeos), M (cierres de 1 s o más), Y/K si hay bostezos y X si algo tapa los ojos.
-   - Segunda pasada: O (los dos ojos con la pupila totalmente tapada) dentro de cada B y M, cuadro a cuadro.
-   - Tiempo aproximado: 40 a 60 minutos por video de 4 minutos.
+   - Segunda pasada, reducida: O (los dos ojos con la pupila totalmente tapada) cuadro a cuadro, solo dentro de
+     cada M y de cada parpadeo pedido por la voz. En los parpadeos espontáneos basta con B: sus cuadros quedan como
+     intermedios y no cuentan ni como positivos ni como negativos.
+   - Tiempo aproximado: 30 a 40 minutos por video de 4 minutos.
    - Si se puede, otra persona anota uno de los videos con `--anotador "Nombre"` (acuerdo entre anotadores).
 2. **Evaluar**:
 

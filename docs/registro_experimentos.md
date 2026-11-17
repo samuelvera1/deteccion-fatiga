@@ -969,3 +969,15 @@ Lectura provisional, que la anotación confirmará o no:
   - 05_10: referencia temporal a los 33,8 s; fuera de rango el 3,7 % (sin corrección, 44 %);
   - video de posturas reanalizado: ninguna referencia temporal y cierre final −0,03.
 - Pruebas: 108. Golden master: sin cambios.
+
+**Anotación reducida para E9, E10 y E13 (2026-11-16, antes de anotar).**
+- La anotación ciega la tiene que hacer una persona. Si la hiciera un sistema automático, el sistema se estaría
+  validando con otra máquina, y además la precisión cuadro a cuadro no se puede garantizar mirando imágenes.
+- Para que sea viable:
+  - el revisor salta con N/P a cada evento pedido por la voz (`guia_voz.csv`; viene del guion, no del sistema);
+  - la segunda pasada (O) se limita a los M y a los parpadeos pedidos.
+- Los parpadeos espontáneos solo llevan B. Sus cuadros quedan como intermedios: no son positivos ni negativos.
+- La definición de C1-C4 no cambia. Los positivos pasan a ser los O de los M y de los parpadeos pedidos, que son los
+  que mueven PERCLOS en estos videos.
+- Orden de prioridad: posturas (E13) y sin gafas (E9). Después, con gafas (E9) y lateral 30° (E10), idealmente por
+  una segunda persona: así se calcula además el acuerdo entre anotadores.
