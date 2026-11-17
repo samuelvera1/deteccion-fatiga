@@ -75,6 +75,23 @@ apuntando a tu cara.
 - Los segundos exactos de cada paso están en `SCRIPT`, en `grabar_perclos.py`.
 - No hace falta exactitud al segundo: lo que cuenta es lo que se anota después, no el guion.
 
+## Video de posturas (E13, 3 minutos)
+
+`--condicion postura`, con la cámara de frente y sin gafas. Seis posturas de 30 s. En cada una la voz pide 2
+parpadeos y un cierre de 2 s (con cuenta regresiva) y luego «Vuelve a la pantalla»:
+
+| Bloque | Postura |
+|---|---|
+| 0:00 | Mirando la pantalla, normal (referencia) |
+| 0:30 | Cabeza un poco abajo, como para mirar el teclado |
+| 1:00 | Cabeza más abajo, como para mirar el celular en la mesa |
+| 1:30 | Solo los ojos hacia abajo, sin mover la cabeza |
+| 2:00 | Cabeza un poco arriba, como para mirar arriba de la pantalla |
+| 2:30 | Directo a la cámara |
+
+Mantén la postura todo el bloque, también con los ojos cerrados. Sirve para decidir con datos cuánto se puede bajar la
+cabeza sin que el sistema vea cierres falsos (criterio de E13 en el registro).
+
 ## Después de grabar
 
 1. **Anotar** cada video en modo ciego (`docs/guia_anotacion.md`):
