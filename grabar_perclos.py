@@ -1,9 +1,10 @@
-"""Graba un video del guion de PERCLOS (E9) con una guía de voz que dice cuándo cerrar y abrir los ojos.
+"""Graba un video del guion de PERCLOS (E9) con una guía de voz que acompaña toda la sesión.
 
-Abre main.py con --grabar y --sin-sonido y empieza a hablar cuando el programa termina la calibración y empieza a
-medir (línea «[MONITOREO]»). Así cada minuto del guion coincide con una ventana de 60 s de PERCLOS de evaluar.py, y
-no hace falta una segunda persona con cronómetro. Los tiempos siguen docs/guion_perclos.md. La voz es la síntesis
-de Windows (System.Speech, con una voz en español instalada); no hay que instalar nada.
+La voz guía la calibración, arranca el guion cuando el programa empieza a medir (línea «[MONITOREO]») y anuncia
+cada cierre con cuenta regresiva. Así cada minuto del guion coincide con una ventana de 60 s de PERCLOS de
+evaluar.py y no hace falta una segunda persona con cronómetro. El guion dura 4 minutos (docs/guion_perclos.md).
+Lo que dijo la voz, y cuándo, queda en guia_voz.csv dentro de la sesión. La voz es la síntesis de Windows
+(System.Speech, con una voz en español instalada); no hay que instalar nada.
 
 Uso (PowerShell, en la carpeta del proyecto):
     .\\venv\\Scripts\\python.exe grabar_perclos.py --probar-voz
@@ -13,6 +14,7 @@ Cualquier otra opción se pasa tal cual a main.py (ej. --fuente 1 para otra cám
 """
 import argparse
 import base64
+import csv
 import json
 import os
 import re
@@ -23,38 +25,65 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BLOCK_S = 60.0
-END_CUE_S = 362.0       # 2 s después del minuto 6, para que la última ventana de 60 s quede completa
+N_BLOCKS = 4
+END_CUE_S = N_BLOCKS * BLOCK_S + 2.0    # 2 s después del último minuto, para que su ventana de 60 s quede completa
+VOICE_RATE = 2                          # velocidad de la voz de Windows (-10 a 10); 2 = algo más ágil que la normal
+COUNTDOWN = ("Tres.", "Dos.", "Uno.")
+SQUINT = ("Entrecierra los ojos, sin cerrarlos.", "Normal.")
+# E9: cámara de frente, sin y con gafas. E10: cámara a un costado, a unos 30 y 45 grados de la dirección en que miras
+CONDITIONS = ("sin_gafas", "con_gafas", "lateral_30", "lateral_45")
 
 
 def _closure(t, seconds):
-    """Cierre voluntario: «Cierra» en t y «Abre» en t + seconds."""
-    return [(t, "Cierra."), (t + seconds, "Abre.")]
+    """Cierre voluntario de `seconds` que empieza en t: «Tres, dos, uno» antes, «Cierra» en t, «Aguanta» a la mitad
+    si dura 3 s o más y «Abre» en t + seconds."""
+    cues = [(t - len(COUNTDOWN) + i, word) for i, word in enumerate(COUNTDOWN)] + [(t, "Cierra.")]
+    if seconds >= 3.0:
+        cues.append((t + seconds / 2, "Aguanta."))
+    return cues + [(t + seconds, "Abre.")]
 
 
 def _hold(t, seconds, start, end):
+    """Acción sostenida (trampa): `start` en t y `end` en t + seconds."""
     return [(t, start), (t + seconds, end)]
 
 
-# (segundo desde el inicio del conteo, texto hablado), según la tabla de docs/guion_perclos.md
+# (segundo desde el inicio del conteo, texto hablado). Las trampas que pueden sacar la postura de rango (celular,
+# giros) van repartidas, como mucho 3 s por minuto, para que cada ventana conserve los 54 s válidos que exige PERCLOS.
 SCRIPT = sorted(
-    [(0.0, "Minuto uno. Lee con normalidad.")]
-    # 1-2: 4 parpadeos lentos y 2 cierres de 1,5 s (segundos 20 y 45)
-    + [(60.0, "Minuto dos.")] + [(t, "Parpadeo lento.") for t in (68.0, 90.0, 98.0, 115.0)]
-    + _closure(80.0, 1.5) + _closure(105.0, 1.5)
-    # 2-3: 4 cierres de 2 s (segundos 10, 25, 40 y 55)
-    + [(120.0, "Minuto tres.")] + [c for t in (130.0, 145.0, 160.0, 175.0) for c in _closure(t, 2.0)]
-    # 3-4: sin cierres; trampas: celular 3 x 5 s, entrecerrar 2 x 5 s (pupila visible), giro a cada lado
-    + [(180.0, "Minuto cuatro. Sin cierres.")]
-    + [c for t in (184.0, 202.0, 220.0) for c in _hold(t, 5.0, "Mira el celular.", "Vuelve a la pantalla.")]
-    + [c for t in (193.0, 211.0) for c in _hold(t, 5.0, "Entrecierra los ojos, sin cerrarlos.", "Normal.")]
-    + _hold(229.0, 3.0, "Gira a la izquierda.", "Al frente.") + _hold(234.0, 3.0, "Gira a la derecha.", "Al frente.")
-    # 4-5: 2 cierres de 4 s (segundos 10 y 35) y 1 de 2 s (segundo 50)
-    + [(240.0, "Minuto cinco.")] + _closure(250.0, 4.0) + _closure(275.0, 4.0) + _closure(290.0, 2.0)
-    # 5-6: normal
-    + [(300.0, "Minuto seis. Normal.")]
-    + [(END_CUE_S, "Fin del guion. Pulsa la tecla Q en la ventana del programa.")])
+    # Minuto 1 (~1-3 %): sin cierres; trampas: entrecerrar 5 s y girar un poco a la izquierda 3 s
+    [(0.0, "Arrancamos. Minuto uno de cuatro: lee tranquilo y parpadea normal."), (11.0, "Ahora, una trampa.")]
+    + _hold(14.0, 5.0, *SQUINT)
+    + _hold(30.0, 3.0, "Gira un poco a la izquierda.", "Al frente.")
+    + [(42.0, "Vas muy bien. Sigue leyendo."), (52.0, "En unos segundos empiezan los cierres.")]
+    # Minuto 2 (~8-10 %): 3 cierres de 1,5 s y 3 parpadeos lentos; trampa: girar un poco a la derecha 3 s
+    + [(60.0, "Minuto dos: tres cierres cortos y parpadeos lentos.")]
+    + _closure(69.0, 1.5) + _closure(84.0, 1.5) + _closure(107.0, 1.5)
+    + [(t, "Parpadeo lento.") for t in (76.0, 91.0, 113.0)]
+    + _hold(96.0, 3.0, "Gira un poco a la derecha.", "Al frente.")
+    + [(117.0, "Bien hecho.")]
+    # Minuto 3 (~14-16 %): 4 cierres de 2 s; trampas: mirar el celular 3 s y entrecerrar 4 s
+    + [(120.0, "Minuto tres: cuatro cierres de dos segundos.")]
+    + [c for t in (128.0, 141.0, 154.0, 167.0) for c in _closure(t, 2.0)]
+    + _hold(132.0, 3.0, "Mira el celular.", "Vuelve a la pantalla.")
+    + _hold(172.0, 4.0, *SQUINT)
+    # Minuto 4 (~18-21 %): 2 cierres de 4 s y 1 de 3 s
+    + [(180.0, "Último minuto: cierres largos. Aguanta con los ojos cerrados hasta que te diga abre.")]
+    + _closure(190.0, 4.0) + _closure(205.0, 4.0) + _closure(222.0, 3.0)
+    + [(231.0, "Ya casi terminamos. Sigue leyendo.")]
+    + [(END_CUE_S, "¡Listo, terminaste! Pulsa la tecla Q en la ventana del programa.")])
 
-# Lee líneas por la entrada estándar y las dice con la primera voz en español instalada
+# Voz durante la calibración, según lo que main.py escribe en la consola (fatigue_framework.py)
+CALIBRATION_CUES = (
+    ("[SESION]", "Hola. Primero calibramos: mira la pantalla y quédate quieto."),
+    ("[PASO 1] Perfil fijado", "Bien. Ahora cierra los ojos, del todo, y no los abras hasta oír el pitido."),
+)
+RETRY_CUE = "No te vi los ojos cerrados. Ábrelos; en unos segundos te pido cerrarlos otra vez."
+RETRY_AGAIN_CUE = "Ciérralos otra vez, del todo, hasta oír el pitido."
+MEASURED_CUE = "Listo. Abre los ojos."
+RESERVE_CUE = "No se midió el ojo cerrado. Pulsa Q y empieza de nuevo."
+
+# Lee líneas en base64 (UTF-8) por la entrada estándar y las dice con la primera voz en español instalada
 _SPEAKER_PS = r"""
 Add-Type -AssemblyName System.Speech
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
@@ -62,21 +91,24 @@ $v = $s.GetInstalledVoices() | Where-Object { $_.Enabled -and $_.VoiceInfo.Cultu
      Select-Object -First 1
 if ($null -eq $v) { [Console]::Out.WriteLine('SIN_VOZ_ES'); exit 1 }
 $s.SelectVoice($v.VoiceInfo.Name)
-$s.Rate = 1
-[Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false
+$s.Rate = __RATE__
+$s.Volume = 100
 [Console]::Out.WriteLine('VOZ ' + $v.VoiceInfo.Name)
 while ($null -ne ($l = [Console]::In.ReadLine())) {
     if ($l -eq '__FIN__') { while ($s.State -eq 'Speaking') { Start-Sleep -Milliseconds 100 }; break }
-    $s.SpeakAsyncCancelAll(); [void]$s.SpeakAsync($l)
+    $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($l))
+    $s.SpeakAsyncCancelAll(); [void]$s.SpeakAsync($text)
 }
 """
 
 
 class Speaker:
-    """Voz de Windows en un proceso de PowerShell que queda abierto (sin la demora de arrancarlo en cada frase)."""
+    """Voz de Windows en un proceso de PowerShell que queda abierto (sin la demora de arrancarlo en cada frase).
+    Cada frase corta la anterior si aún no terminó: el guion deja tiempo para que se diga entera."""
 
-    def __init__(self):
-        encoded = base64.b64encode(_SPEAKER_PS.encode("utf-16-le")).decode("ascii")
+    def __init__(self, rate=VOICE_RATE):
+        script = _SPEAKER_PS.replace("__RATE__", str(int(rate)))
+        encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
         self.proc = subprocess.Popen(
             ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -86,18 +118,28 @@ class Speaker:
             raise RuntimeError("no hay una voz en español instalada en Windows (Configuración > Hora e idioma > Voz)"
                                if first == "SIN_VOZ_ES" else f"no arrancó la voz de Windows ({first or 'sin respuesta'})")
         self.voice = first[4:]
+        self.lock = threading.Lock()
 
     def say(self, text):
-        self.proc.stdin.write((text.replace("\n", " ") + "\n").encode("utf-8"))
-        self.proc.stdin.flush()
+        line = base64.b64encode(text.encode("utf-8")) + b"\n"
+        with self.lock:
+            try:
+                self.proc.stdin.write(line)
+                self.proc.stdin.flush()
+            except OSError:
+                pass        # la voz se cerró: el guion sigue escribiéndose en la consola
 
     def close(self, timeout=10.0):
         """Termina de decir la última frase y cierra el proceso."""
+        with self.lock:
+            try:
+                self.proc.stdin.write(b"__FIN__\n")
+                self.proc.stdin.close()
+            except OSError:
+                pass
         try:
-            self.say("__FIN__")
-            self.proc.stdin.close()
             self.proc.wait(timeout=timeout)
-        except (OSError, subprocess.TimeoutExpired):
+        except subprocess.TimeoutExpired:
             self.proc.kill()
 
 
@@ -105,27 +147,41 @@ def _clock(t):
     return f"{int(t) // 60}:{t % 60:04.1f}"
 
 
-def run_guide(speaker, t0, stop, log):
-    """Dice el guion con t0 como inicio del conteo; devuelve el último segundo dicho (o None si se paró antes)."""
-    last = None
+def run_guide(speaker, t0, stop, log, said):
+    """Dice el guion con t0 (time.monotonic) como inicio del conteo; añade a `said` (t_guion, t_real, texto)."""
     for t, text in SCRIPT:
         if stop.wait(max(0.0, t0 + t - time.monotonic())):
             break
         speaker.say(text)
+        said.append((t, round(time.monotonic() - t0, 3), text))
         log(f"[GUIA {_clock(t)}] {text}")
-        last = t
-    return last
+
+
+def save_cues(session_dir, said):
+    """guia_voz.csv: cada frase del guion con su segundo previsto y el real, ambos desde el inicio del conteo."""
+    with open(os.path.join(session_dir, "guia_voz.csv"), "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["t_guion_s", "t_real_s", "texto"])
+        writer.writerows(said)
+
+
+def test_voice(speaker):
+    cues = [(0.0, "Prueba de voz.")] + _closure(4.0, 2.0) + [(7.5, "Si me oyes bien, todo listo.")]
+    t0 = time.monotonic()
+    for t, text in cues:
+        time.sleep(max(0.0, t0 + t - time.monotonic()))
+        speaker.say(text)
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Graba el guion de PERCLOS (E9) con guía de voz.",
                                      epilog="Las demás opciones pasan a main.py.")
     parser.add_argument("--sujeto", default="S01", help="código anónimo del participante (por defecto S01)")
-    parser.add_argument("--condicion", choices=["sin_gafas", "con_gafas"], help="condición del video")
+    parser.add_argument("--condicion", choices=CONDITIONS, help="condición del video (E9: gafas; E10: cámara de lado)")
     parser.add_argument("--probar-voz", action="store_true", help="solo prueba la voz y el volumen, sin grabar")
     args, extra = parser.parse_known_args(argv)
     if not args.probar_voz and not args.condicion:
-        parser.error("indica --condicion sin_gafas o --condicion con_gafas")
+        parser.error("indica --condicion (" + ", ".join(CONDITIONS) + ")")
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
 
@@ -143,57 +199,73 @@ def main(argv=None):
     log(f"[GUIA] Voz: {speaker.voice}")
 
     if args.probar_voz:
-        for delay, text in ((0.0, "Prueba de voz. Cierra."), (2.0, "Abre."), (1.5, "Si me oyes bien, todo listo.")):
-            time.sleep(delay)
-            speaker.say(text)
+        test_voice(speaker)
         speaker.close()
         return 0
 
     cmd = [sys.executable, "-u", os.path.join(HERE, "main.py"), "--sujeto", args.sujeto,
            "--condicion", args.condicion, "--grabar", "--sin-sonido", *extra]
     env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
-    log("[GUIA] Abriendo el programa. Calibra como siempre: mira al frente y, cuando lo pida, cierra los ojos hasta "
-        "oír el pitido. La voz empieza sola cuando el programa empiece a medir.")
+    log("[GUIA] Abriendo el programa. La voz te guía la calibración y el guion (4 minutos).")
     proc = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
-    stop, guide, result = threading.Event(), None, {}
+    stop, guide, said, timers = threading.Event(), None, [], []
     session_dir, reserve, recalibrated = None, False, False
     for raw in proc.stdout:
         line = raw.decode("utf-8", "replace").rstrip("\r\n")
         log(line)
-        if line.startswith("[PASO 2] Ojo cerrado") and "RESERVA" in line:
-            reserve = True
-            speaker.say("No se midió el ojo cerrado. Pulsa Q y empieza de nuevo.")
-            log("[GUIA] La calibración no midió el ojo cerrado: pulsa Q y vuelve a empezar (E9 exige repetirla).")
-        if "[MONITOREO]" in line:
-            if guide is None:
-                t0 = time.monotonic()
-                guide = threading.Thread(target=lambda: result.update(last=run_guide(speaker, t0, stop, log)),
-                                         daemon=True)
-                guide.start()
-            else:
+        found = re.match(r"\[SESION\] \S+ -> (.+)$", line) or re.search(r"Datos guardados en '(.+)'", line)
+        if found and session_dir is None:
+            session_dir = os.path.join(HERE, found.group(1))     # main.py corre en HERE: rutas relativas a HERE
+        if guide is not None:
+            if "[MONITOREO]" in line:
                 recalibrated = True
                 log("[GUIA] Recalibraste a mitad del guion: el guion sigue su reloj; anótalo como problema si hace falta.")
-        found = re.search(r"Datos guardados en '(.+)'", line)
-        if found:
-            session_dir = found.group(1)
+            continue
+        for prefix, text in CALIBRATION_CUES:
+            if line.startswith(prefix):
+                speaker.say(text)
+        if line.startswith("[PASO 2] No se detectaron"):
+            speaker.say(RETRY_CUE)
+            pause = re.search(r" en (\d+(?:\.\d+)?) s", line)
+            timer = threading.Timer(float(pause.group(1)) if pause else 5.0, speaker.say, (RETRY_AGAIN_CUE,))
+            timer.daemon = True
+            timer.start()
+            timers.append(timer)
+        if line.startswith("[PASO 2] Ojo cerrado:"):
+            if "RESERVA" in line:
+                reserve = True
+                speaker.say(RESERVE_CUE)
+                log("[GUIA] La calibración no midió el ojo cerrado: pulsa Q y vuelve a empezar (E9 exige repetirla).")
+            else:
+                speaker.say(MEASURED_CUE)
+        if "[MONITOREO]" in line:
+            t0 = time.monotonic()
+            guide = threading.Thread(target=run_guide, args=(speaker, t0, stop, log, said), daemon=True)
+            guide.start()
     proc.wait()
     stop.set()
+    for timer in timers:
+        timer.cancel()
     if guide is not None:
         guide.join(timeout=2.0)
     speaker.close(timeout=3.0)
 
     print("\n" + "=" * 50)
-    last = result.get("last")
+    last = said[-1][0] if said else None
     if guide is None:
         print("El programa terminó antes de empezar a medir: no hay video del guion.")
     elif last is None or last < END_CUE_S:
         print(f"[AVISO] El programa terminó en el minuto {_clock(last or 0.0)} del guion, antes del final: "
               "repite la grabación si faltó algún bloque.")
     measured = None
-    if session_dir and os.path.isfile(os.path.join(session_dir, "metadata.json")):
-        with open(os.path.join(session_dir, "metadata.json"), encoding="utf-8") as f:
-            measured = json.load(f).get("resumen", {}).get("ojo_cerrado_medido")
+    if session_dir and os.path.isdir(session_dir):
+        if said:
+            save_cues(session_dir, said)
+        meta_path = os.path.join(session_dir, "metadata.json")
+        if os.path.isfile(meta_path):
+            with open(meta_path, encoding="utf-8") as f:
+                measured = json.load(f).get("resumen", {}).get("ojo_cerrado_medido")
     if reserve or measured is False:
         print("[AVISO] El ojo cerrado no se midió en la calibración: según E9 esta grabación no sirve; repítela.")
     if recalibrated:

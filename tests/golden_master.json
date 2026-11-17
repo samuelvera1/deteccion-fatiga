@@ -5,6 +5,8 @@
   "resumen": {
    "bostezos": 3,
    "calibracion_modo": "automatica",
+   "camara_pitch_grados": 2.2,
+   "camara_yaw_grados": -4.1,
    "duracion_media_bostezo_s": 2.2889,
    "duracion_media_parpadeo_s": 0.2545,
    "duracion_s": 44.07,
@@ -52,6 +54,8 @@
   "resumen": {
    "bostezos": 2,
    "calibracion_modo": "automatica",
+   "camara_pitch_grados": -0.2,
+   "camara_yaw_grados": -1.0,
    "duracion_media_bostezo_s": 2.1833,
    "duracion_media_parpadeo_s": 0.1556,
    "duracion_s": 22.73,
@@ -99,6 +103,8 @@
   "resumen": {
    "bostezos": 1,
    "calibracion_modo": "automatica",
+   "camara_pitch_grados": -0.3,
+   "camara_yaw_grados": -1.2,
    "duracion_media_bostezo_s": 2.2,
    "duracion_media_parpadeo_s": 0.4,
    "duracion_s": 30.73,

@@ -482,3 +482,61 @@ Sincroniza el guion con el inicio del conteo y no cambia ni el guion ni el crite
 
 **Alcance.** Cierres voluntarios de una persona y unas 10 ventanas: valida la medida de PERCLOS cerca de los
 umbrales, no que esos umbrales detecten la somnolencia real.
+
+**Cambio de protocolo antes de grabar (2026-11-16).** La persona que graba pidió videos más cortos: 6 minutos era
+demasiado. Pidió también una voz más activa. Todavía no se había grabado nada.
+- El guion pasa a 4 minutos, uno por nivel de alerta: normal con trampas (~1-3 %), precaución (~8-10 %),
+  somnolencia (~14-16 %) y somnolencia alta (~18-21 %).
+- Las trampas que pueden sacar la postura de rango (mirar el celular, girar) se reparten, como mucho 3 s por
+  minuto, para que todas las ventanas conserven los 54 s válidos.
+- La voz guía también la calibración, anuncia cada cierre con cuenta regresiva y guarda lo que dijo en
+  `guia_voz.csv`.
+- C1 a C4 no cambian. Con dos videos quedan 8 ventanas: el 90 % de C3 exige entonces las 8.
+- En lugar del «PERCLOS del minuto de trampas» se informan los falsos positivos por cuadro durante las trampas
+  (tramos de `guia_voz.csv`).
+
+## E10 — Cámara a un costado (criterio fijado el 2026-11-16, antes de grabar)
+
+**Motivación.** En un PC la cámara no siempre está de frente: una cámara USB al lado del monitor, o un portátil
+puesto de lado. El rango de postura válida (10° arriba o abajo, 40° a los lados) se mide respecto a la postura de
+la calibración, no respecto a la cámara (`fatigue_pose.py`; lo comprueba `tests/test_fatigue_pose.py`). Por eso un
+ángulo fijo de la cámara no invalida la postura. Lo que no se ha medido es si la apertura del ojo sigue siendo
+fiable con la cara vista de lado:
+- el ojo lejano se ve oblicuo;
+- la malla de MediaPipe es menos precisa;
+- la apertura es la media de los dos ojos.
+
+**Hipótesis.** Con la calibración hecha en la postura de trabajo, el estado de ojo cerrado y el PERCLOS por minuto
+cumplen los criterios de E9 con la cámara a unos 30° y a unos 45° de la dirección en que mira la persona.
+
+**Datos.**
+- Dos videos de la misma persona, sin gafas, con el guion de 4 minutos (`grabar_perclos.py`):
+  - `lateral_30`: cámara a un costado;
+  - `lateral_45`: cámara al otro costado.
+- Referencia de cámara de frente: el video `sin_gafas` de E9.
+- Ángulo real: `camara_yaw_grados` del resumen de la sesión. Es el giro de la cara respecto a la cámara en la
+  calibración. Es aproximado, porque la profundidad de MediaPipe es estimada. En tres videos propios con la cámara
+  de frente dio entre −1 y −4°.
+- Anotación ciega igual que en E9.
+- Si la calibración no mide el ojo cerrado, se repite una vez. Si vuelve a fallar, es un resultado: el sistema no
+  es utilizable a ese ángulo.
+
+**Criterio (por video, con `evaluar.py`).**
+- Un ángulo es utilizable si su video cumple C1 a C4 de E9: sensibilidad ≥ 0,80; falsos positivos ≤ 1 %; las 4
+  ventanas dentro de [O − 1, B/M/O + 1]; límites de Bland-Altman dentro de ±2 puntos.
+- Se informan sin que decidan, junto al video de frente:
+  - el ángulo medido;
+  - el porcentaje de tiempo con postura válida;
+  - sensibilidad y precisión de parpadeos;
+  - la proporción de ojo cerrado de la calibración;
+  - la apertura de cada ojo por separado (traza), para ver si el ojo lejano se degrada.
+
+**Variante, solo si un ángulo no cumple.** Usar solo el ojo cercano a la cámara cuando |`camara_yaw_grados`| ≥ 20°.
+El ojo cercano es el de mayor ancho aparente en la calibración.
+- Se compara en el mismo video, reanalizando `grabacion.mp4` sin conexión con las mismas marcas de calibración, la
+  versión actual contra la variante.
+- Se adopta si con ella ese video cumple C1 a C4.
+- Con la cámara de frente no se activa, así que E9 no cambia.
+
+**Alcance.** Una persona y un video por ángulo, con cierres voluntarios. Indica hasta qué ángulo se puede confiar en
+la medida; no lo demuestra para cualquier persona, cámara o luz.

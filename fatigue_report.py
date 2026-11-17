@@ -129,6 +129,8 @@ def session_summary(monitor):
         "parpadeos_descartados_profundidad": monitor.eyes.shallow_rejected,
         "sonrisas_descartadas": monitor.yawn.smile_count,
         "tiempo_postura_fuera_de_rango_s": round(monitor.head.out_time, 2),
+        "camara_yaw_grados": None if monitor.head.camera_angles is None else round(monitor.head.camera_angles[0], 1),
+        "camara_pitch_grados": None if monitor.head.camera_angles is None else round(monitor.head.camera_angles[1], 1),
         "perclos_final_pct": round(monitor.perclos_val, 2),
         "recalibraciones": monitor.recalibration_count,
         "ojo_abierto_ref": monitor.profile.open_ear_baseline,

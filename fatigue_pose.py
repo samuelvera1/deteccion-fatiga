@@ -63,6 +63,18 @@ class HeadPoseTracker:
         except np.linalg.LinAlgError:
             self.ref = None                   # sin referencia: la orientación queda vacía en la traza
 
+    @property
+    def camera_angles(self):
+        """(yaw, pitch) en grados de la postura de calibración respecto al eje de la cámara: cuánto está girada la
+        cara frente a la cámara cuando la persona mira la pantalla como de costumbre (0, 0 = cámara de frente;
+        el signo depende de si la imagen está espejada). Aproximado: la z de MediaPipe es estimada por la red.
+        No interviene en ninguna medida: los rangos de postura son relativos a la calibración. None sin referencia."""
+        if self.ref is None:
+            return None
+        r = self.ref
+        return (float(np.degrees(np.arctan2(r[0, 2], r[2, 2]))),
+                float(np.degrees(np.arcsin(np.clip(-r[1, 2], -1.0, 1.0)))))
+
     def _within(self, max_pitch, max_yaw):
         """True si la cabeza está dentro del rango (o si aún no hay orientación disponible)."""
         if self.pose is None:
