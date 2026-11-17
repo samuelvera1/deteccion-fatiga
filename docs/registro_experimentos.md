@@ -888,3 +888,39 @@ referencia de postura y la apertura del ojo abierto recupera ese tiempo para PER
   CAMARA_MUY_DE_LADO, campo `camara_muy_de_lado` del resumen).
 - El LEEME del ejecutable explica cómo colocar la cámara.
 - Todas las personas de los datasets quedan por debajo de ese límite.
+
+**E14, hallazgo después de adoptarla (2026-11-16, video de posturas 20261116_223101, commit 3dd348f).**
+- Al mantener cada postura 30 s, E14 rehízo la referencia dos veces:
+  - en «cabeza un poco abajo» (+14,6°);
+  - en «cabeza un poco arriba», ya respecto a la anterior.
+- La segunda subió el ojo abierto de 0,107 (calibración) a 0,138: al mirar arriba el párpado sube.
+- Al volver a la pantalla, el ojo abierto se medía con un cierre de +0,26, cuando contra la calibración daba −0,02.
+  La referencia nueva se quedó fija en una postura normal porque esa postura ya estaba dentro del rango nuevo. Así se
+  infla PERCLOS y pueden salir alertas falsas.
+- La simulación de E14 no lo podía ver: en UTA-RLDD nadie mantiene posturas de mirada atípicas.
+
+## E14b — Referencia temporal: se vuelve a la calibración en cuanto la postura vuelve a su rango (criterio fijado el 2026-11-16, antes de simular)
+
+**Hipótesis.** El fallo de E14 desaparece si la referencia rehecha solo se usa mientras la postura está fuera del
+rango de la calibración original. En cuanto vuelve a él, se usan la referencia y el ojo abierto de la calibración.
+La ganancia en UTA-RLDD se conserva, porque ahí las personas siguen fuera del rango original.
+
+**Regla.**
+- Se crea una referencia temporal igual que en E14, tras 20 s fuera de rango y quieta.
+- Para cada cuadro:
+  - si está dentro del rango de la calibración original, es válido y se usa el ojo abierto original;
+  - si no, pero hay referencia temporal y está dentro de su rango, es válido y se usa el ojo abierto temporal;
+  - si no, no es válido.
+
+**Criterio.**
+- (1) a (3) de E14 sobre los mismos datos (UTA-RLDD y Eyeblink8).
+- (4) Comprobación del fallo observado. Es el mismo video que lo mostró, así que no es una validación
+  independiente: en el video de posturas, al final (pantalla, desde el segundo 178), la mediana del cierre con la
+  regla debe quedar a ±0,10 de la medida contra la calibración.
+  - Reconstrucción: el cabeceo y el giro respecto a la calibración se obtienen sumando a la traza los ángulos de cada
+    REFERENCIA_REHECHA.
+- Si cumple, E14b sustituye a E14. Si no, se desactiva E14.
+
+**Fuera del alcance de E14b.** Mirar hacia abajo solo con los ojos da cierres falsos también contra la calibración
+original (bloque «ojos abajo»: cierre mediano 0,79, con picos de 1,0 y un micro-sueño falso de 14 s). Eso es la
+mirada, no la referencia, y lo trata E13 con la anotación.
