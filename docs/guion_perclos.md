@@ -11,7 +11,7 @@ Los cuatro con la misma persona, el mismo día y la misma luz:
 | Video | `--condicion` | Cámara | Experimento |
 |---|---|---|---|
 | 1 | `sin_gafas` | de frente | E9 (y referencia de E10) |
-| 2 | `con_gafas` | de frente | E9 |
+| 2 | `con_gafas` | de frente | E9 (ya grabado con el guion v2: sesión 20261116_195327) |
 | 3 | `lateral_30` | a un costado, a unos 30° | E10 |
 | 4 | `lateral_45` | al otro costado, a unos 45° | E10 |
 
@@ -27,7 +27,11 @@ programa mide el ángulo real de la cara respecto a la cámara (`camara_yaw_grad
 
 ## Antes de grabar
 
-- Luz normal de oficina, a la distancia habitual. Un texto para leer y el celular a mano.
+- Luz normal de oficina, **de frente** (no detrás de ti), a la distancia habitual. Con gafas, baja el brillo de la
+  pantalla o inclínala hasta que no se refleje en los lentes: en el video con gafas los reflejos tapaban los ojos.
+- Un texto para leer y el celular a mano.
+- Con los ojos cerrados, **la cabeza quieta**: bajarla más de 10° deja esos segundos sin datos válidos, y con más
+  de 6 s así el minuto se queda sin los 54 s que exige la alerta («Reuniendo datos 52 de 54 s»).
 - **Guía de voz** (`grabar_perclos.py`). La voz te guía la calibración y, cuando el programa empieza a medir, cada
   paso del guion. Antes de cada cierre hace una cuenta regresiva («Tres, dos, uno, cierra») y en los cierres largos
   dice «Aguanta». Así cada minuto del guion coincide con una ventana de 60 s de PERCLOS y no hace falta una segunda
@@ -54,7 +58,7 @@ programa mide el ángulo real de la cara respecto a la cámara (`camara_yaw_grad
 
 | Minuto | Qué hace la persona | PERCLOS esperado |
 |---|---|---|
-| 0-1 | Lee y parpadea normal. Trampas: entrecerrar los ojos 5 s (con la pupila visible) y girar un poco a la izquierda 3 s. | ~1-3 % (normal) |
+| 0-1 | Parpadeos dirigidos: «Haz un parpadeo» (5 veces) y «Tres parpadeos seguidos» (2 veces). Trampas: entrecerrar los ojos 5 s (con la pupila visible) y girar un poco a la izquierda 3 s. | ~2-4 % (normal) |
 | 1-2 | 3 cierres de 1,5 s, 3 parpadeos lentos y girar un poco a la derecha 3 s. | ~8-10 % (precaución) |
 | 2-3 | 4 cierres de 2 s. Trampas: mirar el celular 3 s y entrecerrar los ojos 4 s. | ~14-16 % (somnolencia) |
 | 3-4 | 2 cierres de 4 s y 1 de 3 s. | ~18-21 % (somnolencia) |

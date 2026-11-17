@@ -48,30 +48,41 @@ def _hold(t, seconds, start, end):
     return [(t, start), (t + seconds, end)]
 
 
+# Parpadeos dirigidos del minuto 1: eventos conocidos para comprobar el conteo de parpadeos
+BLINK_CUES = ("Haz un parpadeo.", "Otro parpadeo.", "Uno más.")
+TRIPLE_BLINK = "Tres parpadeos seguidos."
+
 # (segundo desde el inicio del conteo, texto hablado). Las trampas que pueden sacar la postura de rango (celular,
 # giros) van repartidas, como mucho 3 s por minuto, para que cada ventana conserve los 54 s válidos que exige PERCLOS.
 SCRIPT = sorted(
-    # Minuto 1 (~1-3 %): sin cierres; trampas: entrecerrar 5 s y girar un poco a la izquierda 3 s
-    [(0.0, "Arrancamos. Minuto uno de cuatro: lee tranquilo y parpadea normal."), (11.0, "Ahora, una trampa.")]
-    + _hold(14.0, 5.0, *SQUINT)
-    + _hold(30.0, 3.0, "Gira un poco a la izquierda.", "Al frente.")
-    + [(42.0, "Vas muy bien. Sigue leyendo."), (52.0, "En unos segundos empiezan los cierres.")]
+    # Minuto 1 (~2-4 %): parpadeos dirigidos (5 sueltos y 2 series de 3), sin cierres; trampas: entrecerrar 5 s y
+    # girar un poco a la izquierda 3 s
+    [(0.0, "Arrancamos. Minuto uno: parpadeos. Haz lo que te diga, con la cabeza quieta.")]
+    + [(7.0, BLINK_CUES[0]), (11.0, BLINK_CUES[1]), (15.0, BLINK_CUES[2]), (19.0, TRIPLE_BLINK)]
+    + [(26.0, "Ahora, una trampa.")] + _hold(28.0, 5.0, *SQUINT)
+    + [(36.0, BLINK_CUES[0])]
+    + _hold(40.0, 3.0, "Gira un poco a la izquierda.", "Al frente.")
+    + [(46.0, TRIPLE_BLINK), (51.0, BLINK_CUES[0]), (55.0, "Bien. Se vienen los cierres.")]
     # Minuto 2 (~8-10 %): 3 cierres de 1,5 s y 3 parpadeos lentos; trampa: girar un poco a la derecha 3 s
-    + [(60.0, "Minuto dos: tres cierres cortos y parpadeos lentos.")]
+    + [(60.0, "Minuto dos: cierres cortos. No bajes la cabeza.")]
     + _closure(69.0, 1.5) + _closure(84.0, 1.5) + _closure(107.0, 1.5)
     + [(t, "Parpadeo lento.") for t in (76.0, 91.0, 113.0)]
     + _hold(96.0, 3.0, "Gira un poco a la derecha.", "Al frente.")
     + [(117.0, "Bien hecho.")]
     # Minuto 3 (~14-16 %): 4 cierres de 2 s; trampas: mirar el celular 3 s y entrecerrar 4 s
-    + [(120.0, "Minuto tres: cuatro cierres de dos segundos.")]
+    + [(120.0, "Minuto tres: cierres de dos segundos. Cabeza quieta.")]
     + [c for t in (128.0, 141.0, 154.0, 167.0) for c in _closure(t, 2.0)]
     + _hold(132.0, 3.0, "Mira el celular.", "Vuelve a la pantalla.")
     + _hold(172.0, 4.0, *SQUINT)
     # Minuto 4 (~18-21 %): 2 cierres de 4 s y 1 de 3 s
     + [(180.0, "Último minuto: cierres largos. Aguanta con los ojos cerrados hasta que te diga abre.")]
     + _closure(190.0, 4.0) + _closure(205.0, 4.0) + _closure(222.0, 3.0)
-    + [(231.0, "Ya casi terminamos. Sigue leyendo.")]
+    + [(197.0, "Cabeza quieta."), (214.0, "Vas muy bien."), (231.0, "Ya casi terminamos.")]
     + [(END_CUE_S, "¡Listo, terminaste! Pulsa la tecla Q en la ventana del programa.")])
+
+# Antes de abrir el programa: en el video con gafas 20261116_195327 los reflejos de la pantalla tapaban los ojos
+START_CUE = "Revisa la luz: de frente, y sin reflejos de la pantalla en las gafas."
+START_CUE_S = 4.0       # lo que tarda en decirse, antes de abrir el programa (su primera frase lo cortaría)
 
 # Voz durante la calibración, según lo que main.py escribe en la consola (fatigue_framework.py)
 CALIBRATION_CUES = (
@@ -210,6 +221,10 @@ def main(argv=None):
     cmd = [sys.executable, "-u", os.path.join(HERE, "main.py"), "--sujeto", args.sujeto,
            "--condicion", args.condicion, "--grabar", "--sin-sonido", *extra]
     env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
+    log("[GUIA] Antes de empezar: luz de frente (no detrás de ti), brillo de la pantalla bajo para que no se refleje "
+        "en las gafas y ningún otro programa usando la cámara.")
+    speaker.say(START_CUE)
+    time.sleep(START_CUE_S)
     log("[GUIA] Abriendo el programa. La voz te guía la calibración y el guion (4 minutos).")
     proc = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 

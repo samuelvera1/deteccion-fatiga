@@ -546,3 +546,45 @@ El ojo cercano es el de mayor ancho aparente en la calibración.
 
 **Alcance.** Una persona y un video por ángulo, con cierres voluntarios. Indica hasta qué ángulo se puede confiar en
 la medida; no lo demuestra para cualquier persona, cámara o luz.
+
+**Guion v3 (2026-11-16, después del video con gafas).**
+- Por qué cambia: a la persona que grabó, el comienzo le pareció poco claro.
+- Qué cambia en el minuto 1: pasa a parpadeos dirigidos, 5 sueltos y 2 series de 3. Son eventos conocidos para
+  comprobar el conteo de parpadeos.
+- Qué se añade a la voz:
+  - recordatorios de cabeza quieta;
+  - un aviso de luz antes de abrir el programa.
+- Los minutos 2 a 4 no cambian.
+
+**El video con gafas se queda en E9 tal como se grabó** (20261116_195327, guion v2, commit 2923ece).
+- Cumplió el protocolo: ojo cerrado medido al tercer intento y guion completo.
+- Excluirlo después de ver sus problemas sesgaría el resultado.
+- Condiciones que se anotan:
+  - luz tenue de frente;
+  - reflejos de la pantalla en las gafas que tapaban parte de los ojos;
+  - la cabeza bajó entre 10,6 y 12,3° durante 5,6 s (segundos 165-171 del guion), justo al cerrar los ojos.
+- Ese hueco dejó la ventana deslizante con 52,4 s válidos (por debajo de 54) entre los segundos 171 y 230. En ese
+  tiempo la alerta no podía actuar, aunque el PERCLOS iba del 15 al 18 %.
+
+## E11 — Fracción mínima de datos válidos para la alerta (criterio fijado el 2026-11-16, antes de anotar E9 y E10)
+
+**Motivación.** La alerta exige 54 de los últimos 60 s con postura válida (`MIN_VALID_FRACTION` = 0,90). En el video
+con gafas de E9, un cabeceo de 5,6 s la bloqueó durante un minuto entero. En un detector de somnolencia eso es grave:
+cabecear es un signo de sueño, y el sistema se queda sin decir nada justo entonces.
+
+**Hipótesis.** Con 45 s válidos (0,75), el PERCLOS de la ventana coincide con la anotación tan bien como con 54 s.
+
+**Datos.**
+- Los videos anotados de E9 y E10.
+- Ventanas deslizantes de 60 s cada 5 s, con PERCLOS del sistema contra O, como en `evaluar.py`.
+- Las ventanas se solapan, así que no son independientes: los límites de acuerdo son descriptivos.
+
+**Criterio.**
+- Se baja a 0,75 si:
+  - (a) en las ventanas con 45 a 54 s válidos, los límites de Bland-Altman (sistema − O) quedan dentro de ±2 puntos;
+  - (b) hay al menos 10 de esas ventanas, de al menos 2 tramos sin postura válida distintos.
+- Con menos datos no se decide.
+- Se informa además el tiempo de monitoreo sin alerta posible con 0,90 y con 0,75.
+
+**Relación con E1.** Sigue pendiente el experimento controlado que pidió E1: cabeza inclinada a ángulos conocidos.
+Solo ese experimento puede decir si el límite de ±10° se puede ampliar.

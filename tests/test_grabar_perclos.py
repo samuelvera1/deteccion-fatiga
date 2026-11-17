@@ -47,6 +47,12 @@ class GuideScriptTest(unittest.TestCase):
         for start, _ in pairs("Cierra.", "Abre."):
             self.assertTrue({(start - 3, "Tres."), (start - 2, "Dos."), (start - 1, "Uno.")} <= cues, start)
 
+    def test_directed_blinks_in_first_minute(self):
+        singles = [t for t, text in g.SCRIPT if text in g.BLINK_CUES]
+        triples = [t for t, text in g.SCRIPT if text == g.TRIPLE_BLINK]
+        self.assertEqual((len(singles), len(triples)), (5, 2))      # 5 + 2 x 3 = 11 parpadeos pedidos
+        self.assertEqual({minute(t) for t in singles + triples}, {0})
+
     def test_slow_blinks_and_traps(self):
         slow = [t for t, text in g.SCRIPT if text == "Parpadeo lento."]
         self.assertEqual((len(slow), {minute(t) for t in slow}), (3, {1}))
